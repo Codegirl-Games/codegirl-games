@@ -21,6 +21,22 @@ main :: proc() {
 	defer sdl.DestroyRenderer(renderer)
 	defer sdl.DestroyWindow(window)
 
+	surface := sdl.LoadPNG("assets_baked/characters/toad/toad.atlas.png")
+	if surface == nil {
+		fmt.eprintfln("LoadPNG failed: %s", sdl.GetError())
+		return
+	}
+	defer sdl.DestroySurface(surface)
+
+	texture := sdl.CreateTextureFromSurface(renderer, surface)
+	if texture == nil {
+		fmt.eprintfln("CreateTextureFromSurface failed: %s", sdl.GetError())
+		return
+	}
+	defer sdl.DestroyTexture(texture)
+
+	sdl.SetTextureScaleMode(texture, .NEAREST)
+
 	running := true
 
 	for running {
@@ -33,6 +49,13 @@ main :: proc() {
 
 		sdl.SetRenderDrawColor(renderer, 30, 30, 40, 255)
 		sdl.RenderClear(renderer)
+		dst := sdl.FRect {
+			x = 0,
+			y = 0,
+			w = 400,
+			h = 400,
+		}
+		sdl.RenderTexture(renderer, texture, nil, &dst)
 		sdl.RenderPresent(renderer)
 	}
 }
