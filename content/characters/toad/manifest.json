@@ -1,0 +1,17 @@
+{
+  "id": "toad",
+  "pixels_per_unit": 160.0,
+  "pivot": [0.5, 1.0],
+  "clips": {
+    "idle": {
+      "folder": "Idle",
+      "fps": 10,
+      "loop": true
+    },
+    "walk": {
+      "folder": "Walk",
+      "fps": 10,
+      "loop": true
+    }
+  }
+}
