@@ -84,7 +84,7 @@ to_clip :: proc(px, py, sw, sh: f32) -> [2]f32 {
 
 draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 	if app.cmd == nil || app.swapchain_texture == nil {
-		return // begin_frame may have skipped (minimized window, etc.)
+		return
 	}
 	if sprite == nil || sprite.data == nil || sprite.data.texture == nil {
 		return
@@ -93,37 +93,51 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 		return
 	}
 
-	rect, ok := character_frame_rect(sprite.data, sprite.clip, sprite.frame)
+	frame, ok := character_frame(sprite.data, sprite.clip, sprite.frame)
 	if !ok {
 		return
 	}
 
-	fw := f32(rect[2])
-	fh := f32(rect[3])
+	src_w := f32(frame.source_size[0])
+	src_h := f32(frame.source_size[1])
+	if src_w <= 0 do src_w = f32(frame.rect[2])
+	if src_h <= 0 do src_h = f32(frame.rect[3])
 
+	fw := f32(frame.rect[2])
+	fh := f32(frame.rect[3])
+	trim_x := f32(frame.trim_offset[0])
+	trim_y := f32(frame.trim_offset[1])
 	pivot := sprite.data.def.pivot
-	origin := sprite_quad_origin(sprite.position, {fw, fh}, pivot)
-	x0_px := origin.x
-	y0_px := origin.y
+
+	canvas_top := sprite.position.y - src_h * pivot[1]
+	x0_px, y0_px: f32
+	if sprite.flip_x {
+		canvas_left := sprite.position.x - (1.0 - pivot[0]) * src_w
+		x0_px = canvas_left + (src_w - trim_x - fw)
+		y0_px = canvas_top + trim_y
+	} else {
+		canvas_left := sprite.position.x - src_w * pivot[0]
+		x0_px = canvas_left + trim_x
+		y0_px = canvas_top + trim_y
+	}
 	x1_px := x0_px + fw
 	y1_px := y0_px + fh
 
 	sw := f32(app.swapchain_w)
 	sh := f32(app.swapchain_h)
-	p0 := to_clip(x0_px, y0_px, sw, sh) // top-left
-	p1 := to_clip(x1_px, y0_px, sw, sh) // top-right
-	p2 := to_clip(x1_px, y1_px, sw, sh) // bottom-right
-	p3 := to_clip(x0_px, y1_px, sw, sh) // bottom-left
+	p0 := to_clip(x0_px, y0_px, sw, sh)
+	p1 := to_clip(x1_px, y0_px, sw, sh)
+	p2 := to_clip(x1_px, y1_px, sw, sh)
+	p3 := to_clip(x0_px, y1_px, sw, sh)
 
 	tex_w := f32(sprite.data.width)
 	tex_h := f32(sprite.data.height)
-	u0 := f32(rect[0]) / tex_w
-	v0 := f32(rect[1]) / tex_h
-	u1 := f32(rect[0] + rect[2]) / tex_w
-	v1 := f32(rect[1] + rect[3]) / tex_h
+	u0 := f32(frame.rect[0]) / tex_w
+	v0 := f32(frame.rect[1]) / tex_h
+	u1 := f32(frame.rect[0] + frame.rect[2]) / tex_w
+	v1 := f32(frame.rect[1] + frame.rect[3]) / tex_h
 	if sprite.flip_x do u0, u1 = u1, u0
 
-	// Two triangles: (0,1,2) and (0,2,3)
 	verts := [SPRITE_VERT_COUNT]Vertex {
 		{pos = p0, uv = {u0, v0}},
 		{pos = p1, uv = {u1, v0}},

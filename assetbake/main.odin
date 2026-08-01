@@ -56,10 +56,12 @@ Char_Def :: struct {
 
 // Packed atlas pixels + per-frame rects (indexed like the combined frames list)
 Atlas :: struct {
-	pixels: []u8,
-	width:  int,
-	height: int,
-	rects:  [][4]int, // [x, y, w, h] per frame; sizes may differ across clips
+	pixels:        []u8,
+	width:         int,
+	height:        int,
+	rects:         [][4]int,
+	source_sizes:  [][2]int,
+	trim_offsets:  [][2]int,
 }
 
 // Where one clip's frames sit inside the packed atlas frame list
@@ -95,6 +97,8 @@ bake_character :: proc(in_dir, out_dir: string) {
 	atlas := pack_atlas(frames)
 	defer delete(atlas.pixels)
 	defer delete(atlas.rects)
+	defer delete(atlas.source_sizes)
+	defer delete(atlas.trim_offsets)
 
 	ensure_dir(out_dir)
 
@@ -283,22 +287,56 @@ destroy_frames :: proc(frames: []^image.Image) {
 	delete(frames)
 }
 
-// pack_atlas packs variable-size frames with stb_rect_pack and blits them into one sheet.
-// Caller owns atlas.pixels and atlas.rects.
+opaque_bounds :: proc(img: ^image.Image, alpha_min: u8 = 1) -> (x, y, w, h: int) {
+	iw, ih := int(img.width), int(img.height)
+	pixels := bytes.buffer_to_bytes(&img.pixels)
+
+	min_x, min_y := iw, ih
+	max_x, max_y := -1, -1
+
+	for py in 0 ..< ih {
+		for px in 0 ..< iw {
+			i := (py * iw + px) * 4
+			a := pixels[i + 3]
+			if a >= alpha_min {
+				if px < min_x do min_x = px
+				if py < min_y do min_y = py
+				if px > max_x do max_x = px
+				if py > max_y do max_y = py
+			}
+		}
+	}
+
+	if max_x < min_x {
+		return 0, 0, 1, 1
+	}
+	return min_x, min_y, max_x - min_x + 1, max_y - min_y + 1
+}
+
 pack_atlas :: proc(frames: []^image.Image) -> Atlas {
-	PADDING :: 1 // 1px gap to reduce bleeding if filtered later
+	PADDING :: 1
 
 	pack_rects := make([]stbrp.Rect, len(frames))
 	defer delete(pack_rects)
+
+	trims := make([][4]int, len(frames))
+	defer delete(trims)
+	source_sizes := make([][2]int, len(frames))
+	trim_offsets := make([][2]int, len(frames))
 
 	total_area := 0
 	max_w := 0
 	max_h := 0
 	for frame, i in frames {
-		w := frame.width + PADDING
-		h := frame.height + PADDING
+		tx, ty, tw, th := opaque_bounds(frame)
+		trims[i] = {tx, ty, tw, th}
+		source_sizes[i] = {int(frame.width), int(frame.height)}
+		trim_offsets[i] = {tx, ty}
+
+		w := tw + PADDING
+		h := th + PADDING
 		pack_rects[i] = stbrp.Rect {
-			id = c.int(i), // pack_rects may reorder; id maps back to frame index
+			id = c.int(i),
 			w  = stbrp.Coord(w),
 			h  = stbrp.Coord(h),
 		}
@@ -307,7 +345,6 @@ pack_atlas :: proc(frames: []^image.Image) -> Atlas {
 		max_h = max(max_h, h)
 	}
 
-	// Grow a square-ish atlas until everything fits
 	side := max(max_w, max_h, int(math.ceil(math.sqrt(f64(total_area)))))
 	atlas_w, atlas_h := 0, 0
 	packed := false
@@ -326,10 +363,9 @@ pack_atlas :: proc(frames: []^image.Image) -> Atlas {
 		os.exit(1)
 	}
 
-	pixels := make([]u8, atlas_w * atlas_h * 4) // transparent
+	pixels := make([]u8, atlas_w * atlas_h * 4)
 	rects := make([][4]int, len(frames))
 
-	// Blit using each rect's id (array order may have changed during packing)
 	for pr in pack_rects {
 		if !pr.was_packed {
 			fmt.eprintfln("frame %d was not packed", pr.id)
@@ -337,27 +373,30 @@ pack_atlas :: proc(frames: []^image.Image) -> Atlas {
 		}
 		idx := int(pr.id)
 		frame := frames[idx]
-		fw := frame.width
-		fh := frame.height
+		trim := trims[idx]
+		tx, ty, tw, th := trim[0], trim[1], trim[2], trim[3]
 		dst_x := int(pr.x)
 		dst_y := int(pr.y)
 
 		src := bytes.buffer_to_bytes(&frame.pixels)
-		for y in 0 ..< fh {
-			src_row := src[y * fw * 4:(y + 1) * fw * 4]
+		src_w := int(frame.width)
+		for y in 0 ..< th {
+			src_row := src[((ty + y) * src_w + tx) * 4:][:tw * 4]
 			dst_i := ((dst_y + y) * atlas_w + dst_x) * 4
 			copy(pixels[dst_i:], src_row)
 		}
 
-		rects[idx] = {dst_x, dst_y, fw, fh}
+		rects[idx] = {dst_x, dst_y, tw, th}
 	}
 
 	fmt.printfln("packed atlas %dx%d", atlas_w, atlas_h)
 	return Atlas {
-		pixels = pixels,
-		width  = atlas_w,
-		height = atlas_h,
-		rects  = rects,
+		pixels       = pixels,
+		width        = atlas_w,
+		height       = atlas_h,
+		rects        = rects,
+		source_sizes = source_sizes,
+		trim_offsets = trim_offsets,
 	}
 }
 
@@ -422,8 +461,8 @@ build_char_def :: proc(
 			r := atlas.rects[slot]
 			frame_defs[i] = Frame_Def {
 				rect        = r,
-				source_size = {r[2], r[3]},
-				trim_offset = {0, 0}, // no trimming in v1
+				source_size = atlas.source_sizes[slot],
+				trim_offset = atlas.trim_offsets[slot],
 			}
 		}
 
