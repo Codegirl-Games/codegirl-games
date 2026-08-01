@@ -1,6 +1,7 @@
 package engine
 
 import "core:fmt"
+import "core:mem"
 import "core:path/filepath"
 import sdl "vendor:sdl3"
 
@@ -10,7 +11,14 @@ Vertex :: struct {
 }
 
 SPRITE_VERT_COUNT :: 6
-VERTEX_BUFFER_SIZE :: SPRITE_VERT_COUNT * size_of(Vertex)
+MAX_SPRITES :: 128
+SPRITE_VERTS_SIZE :: SPRITE_VERT_COUNT * size_of(Vertex)
+VERTEX_BUFFER_SIZE :: MAX_SPRITES * SPRITE_VERTS_SIZE
+
+Queued_Sprite :: struct {
+	texture: ^sdl.GPUTexture,
+	verts:   [SPRITE_VERT_COUNT]Vertex,
+}
 
 App :: struct {
 	window:            ^sdl.Window,
@@ -25,6 +33,8 @@ App :: struct {
 	swapchain_h:       u32,
 	vertex_buffer:     ^sdl.GPUBuffer,
 	transfer_buffer:   ^sdl.GPUTransferBuffer,
+	draw_list:         [dynamic]Queued_Sprite,
+	clear_color:       sdl.FColor,
 }
 
 Shader_Backend :: enum {
@@ -112,10 +122,14 @@ init :: proc(app: ^App, title: cstring, width, height: i32) -> bool {
 		return false
 	}
 
+	app.draw_list = make([dynamic]Queued_Sprite)
+
 	return true
 }
 
 shutdown :: proc(app: ^App) {
+	delete(app.draw_list)
+
 	if app.device != nil {
 		ok := sdl.WaitForGPUIdle(app.device)
 		if !ok {
@@ -164,9 +178,13 @@ events :: proc() -> bool {
 	return true
 }
 
-begin_frame :: proc(app: ^App, clear: sdl.FColor = {0.12, 0.12, 0.16, 1}) {
-	app.cmd = sdl.AcquireGPUCommandBuffer(app.device)
+begin_frame :: proc(app: ^App, clear_color: sdl.FColor = {0.12, 0.12, 0.16, 1}) {
+	clear(&app.draw_list)
+	app.clear_color = clear_color
+	app.render_pass = nil
+	app.swapchain_texture = nil
 
+	app.cmd = sdl.AcquireGPUCommandBuffer(app.device)
 	if app.cmd == nil {
 		fmt.eprintfln("AcquireGPUCommandBuffer failed: %s", sdl.GetError())
 		return
@@ -181,36 +199,98 @@ begin_frame :: proc(app: ^App, clear: sdl.FColor = {0.12, 0.12, 0.16, 1}) {
 	)
 
 	if !ok || app.swapchain_texture == nil {
+		app.swapchain_texture = nil
 		return
+	}
+}
+
+end_frame :: proc(app: ^App) {
+	if app.cmd == nil {
+		clear(&app.draw_list)
+		return
+	}
+
+	cmd := app.cmd
+	defer {
+		app.render_pass = nil
+		app.swapchain_texture = nil
+		app.cmd = nil
+		clear(&app.draw_list)
+	}
+
+	if app.swapchain_texture == nil {
+		if !sdl.SubmitGPUCommandBuffer(cmd) {
+			fmt.eprintfln("SubmitGPUCommandBuffer failed")
+		}
+		return
+	}
+
+	n := len(app.draw_list)
+	if n > 0 {
+		map_ptr := sdl.MapGPUTransferBuffer(app.device, app.transfer_buffer, false)
+		if map_ptr == nil {
+			fmt.eprintfln("MapGPUTransferBuffer failed: %s", sdl.GetError())
+			if !sdl.SubmitGPUCommandBuffer(cmd) {
+				fmt.eprintfln("SubmitGPUCommandBuffer failed")
+			}
+			return
+		}
+
+		for i in 0 ..< n {
+			q := &app.draw_list[i]
+			offset := i * SPRITE_VERTS_SIZE
+			mem.copy(
+				rawptr(uintptr(map_ptr) + uintptr(offset)),
+				raw_data(q.verts[:]),
+				SPRITE_VERTS_SIZE,
+			)
+		}
+		sdl.UnmapGPUTransferBuffer(app.device, app.transfer_buffer)
+
+		copy_pass := sdl.BeginGPUCopyPass(cmd)
+		src := sdl.GPUTransferBufferLocation {
+			transfer_buffer = app.transfer_buffer,
+			offset          = 0,
+		}
+		dst := sdl.GPUBufferRegion {
+			buffer = app.vertex_buffer,
+			offset = 0,
+			size   = u32(n * SPRITE_VERTS_SIZE),
+		}
+		sdl.UploadToGPUBuffer(copy_pass, src, dst, false)
+		sdl.EndGPUCopyPass(copy_pass)
 	}
 
 	color_info := sdl.GPUColorTargetInfo {
 		texture     = app.swapchain_texture,
-		clear_color = clear,
+		clear_color = app.clear_color,
 		load_op     = .CLEAR,
 		store_op    = .STORE,
 	}
-
-	app.render_pass = sdl.BeginGPURenderPass(app.cmd, &color_info, 1, nil)
-
+	app.render_pass = sdl.BeginGPURenderPass(cmd, &color_info, 1, nil)
 	sdl.BindGPUGraphicsPipeline(app.render_pass, app.pipeline)
-}
 
-end_frame :: proc(app: ^App) {
-	if app.render_pass != nil {
-		sdl.EndGPURenderPass(app.render_pass)
-		app.render_pass = nil
-	}
-
-	if app.cmd != nil {
-		ok := sdl.SubmitGPUCommandBuffer(app.cmd)
-		if !ok {
-			fmt.eprintfln("SubmitGPUCommandBuffer failed")
+	for q, i in app.draw_list {
+		sampler_binding := sdl.GPUTextureSamplerBinding {
+			texture = q.texture,
+			sampler = app.sampler,
 		}
-		app.cmd = nil
+		sdl.BindGPUFragmentSamplers(app.render_pass, 0, &sampler_binding, 1)
+
+		vb_binding := sdl.GPUBufferBinding {
+			buffer = app.vertex_buffer,
+			offset = u32(i * SPRITE_VERTS_SIZE),
+		}
+		sdl.BindGPUVertexBuffers(app.render_pass, 0, &vb_binding, 1)
+		sdl.DrawGPUPrimitives(app.render_pass, SPRITE_VERT_COUNT, 1, 0, 0)
 	}
 
-	app.swapchain_texture = nil
+	sdl.EndGPURenderPass(app.render_pass)
+	app.render_pass = nil
+
+	if !sdl.SubmitGPUCommandBuffer(cmd) {
+		fmt.eprintfln("SubmitGPUCommandBuffer failed")
+	}
 }
 
 load_gpu_shader :: proc(

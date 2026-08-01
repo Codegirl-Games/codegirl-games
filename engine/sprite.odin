@@ -1,6 +1,5 @@
 package engine
 
-import "core:mem"
 import sdl "vendor:sdl3"
 
 Vec2 :: [2]f32
@@ -40,7 +39,6 @@ spawn_sprite :: proc(
 	return sprite
 }
 
-// stubbed for later
 update_sprite :: proc(sprite: ^Sprite, dt: f32) {
 	if sprite == nil || sprite.data == nil do return
 	if dt <= 0 do return
@@ -85,10 +83,13 @@ to_clip :: proc(px, py, sw, sh: f32) -> [2]f32 {
 }
 
 draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
-	if app.render_pass == nil || app.cmd == nil || app.swapchain_texture == nil {
+	if app.cmd == nil || app.swapchain_texture == nil {
 		return // begin_frame may have skipped (minimized window, etc.)
 	}
 	if sprite == nil || sprite.data == nil || sprite.data.texture == nil {
+		return
+	}
+	if len(app.draw_list) >= MAX_SPRITES {
 		return
 	}
 
@@ -123,7 +124,7 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 	if sprite.flip_x do u0, u1 = u1, u0
 
 	// Two triangles: (0,1,2) and (0,2,3)
-	verts := [6]Vertex {
+	verts := [SPRITE_VERT_COUNT]Vertex {
 		{pos = p0, uv = {u0, v0}},
 		{pos = p1, uv = {u1, v0}},
 		{pos = p2, uv = {u1, v1}},
@@ -132,54 +133,10 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 		{pos = p3, uv = {u0, v1}},
 	}
 
-	map_ptr := sdl.MapGPUTransferBuffer(app.device, app.transfer_buffer, false)
-	if map_ptr == nil {
-		return
-	}
-	mem.copy(map_ptr, raw_data(verts[:]), size_of(verts))
-	sdl.UnmapGPUTransferBuffer(app.device, app.transfer_buffer)
-
-	// IMPORTANT: SDL does not allow beginning a copy pass while a render pass
-	// is active on the same command buffer. Upload on a separate command buffer.
-	copy_cmd := sdl.AcquireGPUCommandBuffer(app.device)
-	if copy_cmd == nil {
-		return
-	}
-	copy_pass := sdl.BeginGPUCopyPass(copy_cmd)
-
-	src := sdl.GPUTransferBufferLocation {
-		transfer_buffer = app.transfer_buffer,
-		offset          = 0,
-	}
-	dst := sdl.GPUBufferRegion {
-		buffer = app.vertex_buffer,
-		offset = 0,
-		size   = u32(size_of(verts)),
-	}
-	sdl.UploadToGPUBuffer(copy_pass, src, dst, false)
-	sdl.EndGPUCopyPass(copy_pass)
-	fence := sdl.SubmitGPUCommandBufferAndAcquireFence(copy_cmd)
-	if fence == nil {
-		return
-	}
-	defer sdl.ReleaseGPUFence(app.device, fence)
-	if !sdl.WaitForGPUFences(app.device, true, &fence, 1) {
-		return
-	}
-
-	sampler_binding := sdl.GPUTextureSamplerBinding {
-		texture = sprite.data.texture,
-		sampler = app.sampler,
-	}
-	sdl.BindGPUFragmentSamplers(app.render_pass, 0, &sampler_binding, 1)
-
-	vb_binding := sdl.GPUBufferBinding {
-		buffer = app.vertex_buffer,
-		offset = 0,
-	}
-	sdl.BindGPUVertexBuffers(app.render_pass, 0, &vb_binding, 1)
-
-	sdl.DrawGPUPrimitives(app.render_pass, 6, 1, 0, 0)
+	append(
+		&app.draw_list,
+		Queued_Sprite{texture = sprite.data.texture, verts = verts},
+	)
 }
 
 set_sprite_clip :: proc(sprite: ^Sprite, clip: string) {
