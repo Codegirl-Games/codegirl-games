@@ -99,9 +99,10 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 	fw := f32(rect[2])
 	fh := f32(rect[3])
 
-	// Feet-centered placement, same as renderer version
-	x0_px := sprite.position.x - fw * 0.5
-	y0_px := sprite.position.y - fh
+	pivot := sprite.data.def.pivot
+	origin := sprite_quad_origin(sprite.position, {fw, fh}, pivot)
+	x0_px := origin.x
+	y0_px := origin.y
 	x1_px := x0_px + fw
 	y1_px := y0_px + fh
 
@@ -190,4 +191,8 @@ set_sprite_clip :: proc(sprite: ^Sprite, clip: string) {
 	sprite.clip = clip
 	sprite.frame = 0
 	sprite.time = 0
+}
+
+sprite_quad_origin :: proc(position: Vec2, size: Vec2, pivot: [2]f32) -> Vec2 {
+	return {position.x - size.x * pivot[0], position.y - size.y * pivot[1]}
 }
