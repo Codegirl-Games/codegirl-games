@@ -5,12 +5,12 @@
   "clips": {
     "idle": {
       "folder": "Idle",
-      "fps": 10,
+      "fps": 15,
       "loop": true
     },
     "walk": {
       "folder": "Walk",
-      "fps": 10,
+      "fps": 15,
       "loop": true
     }
   }

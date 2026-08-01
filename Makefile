@@ -1,7 +1,8 @@
-.PHONY: shaders-vulkan shaders-d3d12 shaders-metal shaders-all toad check test help
+.PHONY: shaders-vulkan shaders-d3d12 shaders-metal shaders-all bake toad check test help
 
 help:
 	@echo "Targets:"
+	@echo "  bake            Bake all characters under content/characters/"
 	@echo "  shaders-vulkan  Compile SPIR-V into shaders/vulkan/"
 	@echo "  shaders-d3d12   Compile DXIL into shaders/d3d12/ (needs shadercross)"
 	@echo "  shaders-metal   Compile MSL into shaders/metal/ (needs shadercross)"
@@ -9,6 +10,9 @@ help:
 	@echo "  test            Run engine unit tests"
 	@echo "  check           Typecheck examples/toad"
 	@echo "  toad            Run the toad example"
+
+bake:
+	./scripts/bake_all.sh
 
 shaders-vulkan:
 	./scripts/shaders_vulkan.sh
