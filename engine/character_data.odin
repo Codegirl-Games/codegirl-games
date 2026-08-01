@@ -210,6 +210,22 @@ character_clip :: proc(data: ^Character_Data, clip_name: string) -> (clip: Clip_
 	return character, true
 }
 
+character_frame :: proc(
+	data: ^Character_Data,
+	clip_name: string,
+	frame_index: int,
+) -> (
+	frame: Frame_Def,
+	ok: bool,
+) {
+	if data == nil do return {}, false
+	clip, found := data.def.clips[clip_name]
+	if !found || frame_index < 0 || frame_index >= len(clip.frames) {
+		return {}, false
+	}
+	return clip.frames[frame_index], true
+}
+
 character_frame_rect :: proc(
 	data: ^Character_Data,
 	clip_name: string,
@@ -218,10 +234,7 @@ character_frame_rect :: proc(
 	rect: [4]int,
 	ok: bool,
 ) {
-	clip, found := data.def.clips[clip_name]
-	if !found || frame_index < 0 || frame_index >= len(clip.frames) {
-		return {}, false
-	}
-
-	return clip.frames[frame_index].rect, true
+	frame, found := character_frame(data, clip_name, frame_index)
+	if !found do return {}, false
+	return frame.rect, true
 }
