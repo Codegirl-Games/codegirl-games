@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+
+jobs:
+  test:
+    name: Engine tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Ubuntu 24.04 does not ship libsdl3-dev; build/install SDL3 from source (cached).
+      - name: Setup SDL3
+        id: sdl
+        uses: libsdl-org/setup-sdl@main
+        with:
+          version: 3-latest
+          install-linux-dependencies: true
+          add-to-environment: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Export SDL3 paths for the linker
+        run: |
+          PREFIX="${{ steps.sdl.outputs.prefix }}"
+          echo "PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "$GITHUB_ENV"
+          echo "LIBRARY_PATH=${PREFIX}/lib:${LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=${PREFIX}/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          echo "C_INCLUDE_PATH=${PREFIX}/include:${C_INCLUDE_PATH:-}" >> "$GITHUB_ENV"
+          # Help some linkers find the shared lib without rpath surprises
+          if [ -d "${PREFIX}/lib" ]; then
+            echo "${PREFIX}/lib" | sudo tee /etc/ld.so.conf.d/sdl3-ci.conf >/dev/null
+            sudo ldconfig
+          fi
+
+      - name: Setup Odin
+        uses: laytan/setup-odin@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Match local toolchain: odin version dev-2026-05
+          release: dev-2026-05
+
+      - name: Odin version
+        run: odin version
+
+      - name: Unit tests
+        run: make test
+
+      - name: Typecheck toad example
+        run: make check
