@@ -4,7 +4,7 @@ import eng "pkg:engine"
 
 main :: proc() {
 	app: eng.App
-	if !eng.init(&app, "toad", 800, 600) do return
+	if !eng.init(&app, "toad game", 800, 600) do return
 	defer eng.shutdown(&app)
 
 	data, ok := eng.load_character_data(&app, "assets_baked/characters/toad/toad.char.json")
@@ -14,10 +14,17 @@ main :: proc() {
 
 	toad := eng.spawn_sprite(&data, {400, 500}, "idle", 0)
 
+	last := eng.now_seconds()
+
 	for eng.events() {
+		now := eng.now_seconds()
+		dt := f32(now - last)
+		last = now
+
+		eng.update_sprite(&toad, dt)
+
 		eng.begin_frame(&app)
 		eng.draw_sprite(&app, &toad)
 		eng.end_frame(&app)
 	}
 }
-

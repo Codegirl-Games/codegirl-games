@@ -10,6 +10,7 @@ Sprite :: struct {
 	position: Vec2,
 	clip:     string,
 	frame:    int,
+	time:     f32,
 }
 
 spawn_sprite :: proc(
@@ -18,13 +19,61 @@ spawn_sprite :: proc(
 	clip: string = "idle",
 	frame: int = 0,
 ) -> Sprite {
-	return Sprite{data = data, position = position, clip = clip, frame = frame}
+	sprite := Sprite {
+		data     = data,
+		position = position,
+	}
+	set_sprite_clip(&sprite, clip)
+	if frame != 0 {
+		c, ok := character_clip(sprite.data, sprite.clip)
+		if ok {
+			if frame < 0 {
+				sprite.frame = 0
+			} else if frame >= len(c.frames) {
+				sprite.frame = len(c.frames) - 1
+			} else {
+				sprite.frame = frame
+			}
+		}
+	}
+	return sprite
 }
 
 // stubbed for later
 update_sprite :: proc(sprite: ^Sprite, dt: f32) {
-	_ = sprite
-	_ = dt
+	if sprite == nil || sprite.data == nil do return
+	if dt <= 0 do return
+
+	clip, ok := character_clip(sprite.data, sprite.clip)
+	if !ok do return
+
+	frame_count := len(clip.frames)
+	if frame_count <= 0 do return
+
+	if sprite.frame < 0 do sprite.frame = 0
+	if sprite.frame >= frame_count do sprite.frame = frame_count - 1
+
+	if clip.fps <= 0 do return
+
+	sprite.time += dt
+	frame_duration := 1.0 / clip.fps
+
+	for sprite.time >= frame_duration {
+		sprite.time -= frame_duration
+		next := sprite.frame + 1
+
+		if next >= frame_count {
+			if clip.loop {
+				sprite.frame = 0
+			} else {
+				sprite.frame = frame_count - 1
+				sprite.time = 0
+				break
+			}
+		} else {
+			sprite.frame = next
+		}
+	}
 }
 
 to_clip :: proc(px, py, sw, sh: f32) -> [2]f32 {
@@ -128,4 +177,17 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 	sdl.BindGPUVertexBuffers(app.render_pass, 0, &vb_binding, 1)
 
 	sdl.DrawGPUPrimitives(app.render_pass, 6, 1, 0, 0)
+}
+
+set_sprite_clip :: proc(sprite: ^Sprite, clip: string) {
+	if sprite == nil || sprite.data == nil do return
+
+	if sprite.clip == clip do return
+
+	_, ok := character_clip(sprite.data, clip)
+	if !ok do return
+
+	sprite.clip = clip
+	sprite.frame = 0
+	sprite.time = 0
 }

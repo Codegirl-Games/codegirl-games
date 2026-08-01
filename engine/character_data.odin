@@ -170,7 +170,10 @@ load_character_data :: proc(app: ^App, character_json_path: string) -> (Characte
 	sdl.EndGPUCopyPass(copy_pass)
 	fence := sdl.SubmitGPUCommandBufferAndAcquireFence(cmd)
 	if fence == nil {
-		fmt.eprintfln("SubmitGPUCommandBufferAndAcquireFence (texture upload) failed: %s", sdl.GetError())
+		fmt.eprintfln(
+			"SubmitGPUCommandBufferAndAcquireFence (texture upload) failed: %s",
+			sdl.GetError(),
+		)
 		sdl.ReleaseGPUTransferBuffer(app.device, tbuf)
 		sdl.ReleaseGPUTexture(app.device, out.texture)
 		return {}, false
@@ -198,6 +201,13 @@ destroy_character_data :: proc(app: ^App, data: ^Character_Data) {
 		sdl.ReleaseGPUTexture(app.device, data.texture)
 	}
 	data^ = {}
+}
+
+character_clip :: proc(data: ^Character_Data, clip_name: string) -> (clip: Clip_Def, ok: bool) {
+	if data == nil do return {}, false
+	character, found := data.def.clips[clip_name]
+	if !found || len(character.frames) == 0 do return {}, false
+	return character, true
 }
 
 character_frame_rect :: proc(
