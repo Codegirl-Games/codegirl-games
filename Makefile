@@ -6,7 +6,7 @@ help:
 	@echo "  shaders-d3d12   Compile DXIL into shaders/d3d12/ (needs shadercross)"
 	@echo "  shaders-metal   Compile MSL into shaders/metal/ (needs shadercross)"
 	@echo "  shaders-all     Build all shader backends"
-	@echo "  test            Run engine pure unit tests"
+	@echo "  test            Run engine unit tests"
 	@echo "  check           Typecheck examples/toad"
 	@echo "  toad            Run the toad example"
 
