@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+
+jobs:
+  test:
+    name: Engine tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install SDL3
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl3-dev
+
+      - name: Setup Odin
+        uses: laytan/setup-odin@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Match local toolchain: odin version dev-2026-05
+          release: dev-2026-05
+
+      - name: Odin version
+        run: odin version
+
+      - name: Unit tests
+        run: make test
+
+      - name: Typecheck toad example
+        run: make check
