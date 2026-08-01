@@ -1,6 +1,7 @@
 package engine
 
 import "core:fmt"
+import "core:path/filepath"
 import sdl "vendor:sdl3"
 
 Vertex :: struct {
@@ -11,12 +12,10 @@ Vertex :: struct {
 SPRITE_VERT_COUNT :: 6
 VERTEX_BUFFER_SIZE :: SPRITE_VERT_COUNT * size_of(Vertex)
 
-VERT_SPV := #load("../shaders/sprite.vert.spv")
-FRAG_SPV := #load("../shaders/sprite.frag.spv")
-
 App :: struct {
 	window:            ^sdl.Window,
 	device:            ^sdl.GPUDevice,
+	shader:            Shader_Runtime,
 	pipeline:          ^sdl.GPUGraphicsPipeline,
 	sampler:           ^sdl.GPUSampler,
 	cmd:               ^sdl.GPUCommandBuffer,
@@ -26,6 +25,19 @@ App :: struct {
 	swapchain_h:       u32,
 	vertex_buffer:     ^sdl.GPUBuffer,
 	transfer_buffer:   ^sdl.GPUTransferBuffer,
+}
+
+Shader_Backend :: enum {
+	Vulkan_SPIRV,
+	DSD12_DXIL,
+	Metal_MSL,
+}
+
+Shader_Runtime :: struct {
+	backend:    Shader_Backend,
+	format:     sdl.GPUShaderFormat,
+	shader_dir: string,
+	entrypoint: cstring,
 }
 
 init :: proc(app: ^App, title: cstring, width, height: i32) -> bool {
@@ -41,7 +53,8 @@ init :: proc(app: ^App, title: cstring, width, height: i32) -> bool {
 		return false
 	}
 
-	app.device = sdl.CreateGPUDevice({.SPIRV}, true, nil)
+	requested: sdl.GPUShaderFormat = {.SPIRV, .DXIL, .MSL}
+	app.device = sdl.CreateGPUDevice(requested, true, nil)
 	if app.device == nil {
 		fmt.eprintfln("CreateGPUDevice failed: %s", sdl.GetError())
 		return false
@@ -52,7 +65,11 @@ init :: proc(app: ^App, title: cstring, width, height: i32) -> bool {
 		return false
 	}
 
-	app.pipeline = create_sprite_pipeline(app.device, app.window)
+	ok: bool
+	app.shader, ok = choose_shader_runtime(app.device)
+	if !ok do return false
+
+	app.pipeline = create_sprite_pipeline(app)
 	if app.pipeline == nil {
 		fmt.eprintfln("create_sprite_pipeline failed: %s", sdl.GetError())
 		return false
@@ -196,10 +213,12 @@ end_frame :: proc(app: ^App) {
 	app.swapchain_texture = nil
 }
 
-load_spirv_shader :: proc(
+load_gpu_shader :: proc(
 	device: ^sdl.GPUDevice,
 	code: []u8,
 	stage: sdl.GPUShaderStage,
+	format: sdl.GPUShaderFormat,
+	entrypoint: cstring,
 	num_samplers: u32,
 ) -> ^sdl.GPUShader {
 	return sdl.CreateGPUShader(
@@ -207,8 +226,8 @@ load_spirv_shader :: proc(
 		{
 			code_size = len(code),
 			code = raw_data(code),
-			entrypoint = "main",
-			format = {.SPIRV},
+			entrypoint = entrypoint,
+			format = format,
 			stage = stage,
 			num_samplers = num_samplers,
 			num_storage_textures = 0,
@@ -218,20 +237,58 @@ load_spirv_shader :: proc(
 	)
 }
 
-create_sprite_pipeline :: proc(
-	device: ^sdl.GPUDevice,
-	window: ^sdl.Window,
-) -> ^sdl.GPUGraphicsPipeline {
-	vert := load_spirv_shader(device, VERT_SPV[:], .VERTEX, 0)
-	if vert == nil do return nil
+shader_filenames :: proc(backend: Shader_Backend) -> (vert_name, frag_name: string) {
+	switch backend {
+	case .Vulkan_SPIRV:
+		return "sprite.vert.spv", "sprite.frag.spv"
+	case .DSD12_DXIL:
+		return "sprite.vert.dxil", "sprite.frag.dxil"
+	case .Metal_MSL:
+		return "sprite.vert.msl", "sprite.frag.msl"
+	}
+	return "", ""
+}
 
-	frag := load_spirv_shader(device, FRAG_SPV[:], .FRAGMENT, 1)
-	if frag == nil {
-		sdl.ReleaseGPUShader(device, vert)
-		return nil
+create_sprite_pipeline :: proc(app: ^App) -> ^sdl.GPUGraphicsPipeline {
+	vert_name, frag_name := shader_filenames(app.shader.backend)
+	vert_path, _ := filepath.join({app.shader.shader_dir, vert_name})
+	frag_path, _ := filepath.join({app.shader.shader_dir, frag_name})
+	defer {
+		delete(vert_path)
+		delete(frag_path)
 	}
 
-	swap_format := sdl.GetGPUSwapchainTextureFormat(device, window)
+	vert_code, vok := load_shader_blob(vert_path)
+	if !vok do return nil
+	defer delete(vert_code)
+
+	frag_code, fok := load_shader_blob(frag_path)
+	if !fok do return nil
+	defer delete(frag_code)
+
+	vert := load_gpu_shader(
+		app.device,
+		vert_code,
+		.VERTEX,
+		app.shader.format,
+		app.shader.entrypoint,
+		0,
+	)
+	if vert == nil do return nil
+
+	frag := load_gpu_shader(
+		app.device,
+		frag_code,
+		.FRAGMENT,
+		app.shader.format,
+		app.shader.entrypoint,
+		1,
+	)
+	if frag == nil {
+		sdl.ReleaseGPUShader(app.device, vert)
+		return nil
+	}
+	swap_format := sdl.GetGPUSwapchainTextureFormat(app.device, app.window)
 
 
 	blend := sdl.GPUColorTargetBlendState {
@@ -274,10 +331,10 @@ create_sprite_pipeline :: proc(
 		target_info = {color_target_descriptions = &color_target, num_color_targets = 1},
 	}
 
-	pipeline := sdl.CreateGPUGraphicsPipeline(device, pipeline_info)
+	pipeline := sdl.CreateGPUGraphicsPipeline(app.device, pipeline_info)
 
-	sdl.ReleaseGPUShader(device, vert)
-	sdl.ReleaseGPUShader(device, frag)
+	sdl.ReleaseGPUShader(app.device, vert)
+	sdl.ReleaseGPUShader(app.device, frag)
 
 	return pipeline
 }
