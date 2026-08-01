@@ -2,6 +2,7 @@ package engine
 
 import "core:encoding/json"
 import "core:fmt"
+import "core:mem"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
@@ -30,16 +31,12 @@ Char_Def :: struct {
 
 Character_Data :: struct {
 	def:     Char_Def,
-	texture: ^sdl.Texture,
+	texture: ^sdl.GPUTexture,
+	width:   int,
+	height:  int,
 }
 
-load_character_data :: proc(
-	renderer: ^sdl.Renderer,
-	character_json_path: string,
-) -> (
-	Character_Data,
-	bool,
-) {
+load_character_data :: proc(app: ^App, character_json_path: string) -> (Character_Data, bool) {
 	file_data, read_err := os.read_entire_file(character_json_path, context.allocator)
 	if read_err != nil {
 		fmt.eprintfln("failed to read %s: %v", character_json_path, read_err)
@@ -75,18 +72,120 @@ load_character_data :: proc(
 	}
 	defer sdl.DestroySurface(surface)
 
-	out.texture = sdl.CreateTextureFromSurface(renderer, surface)
+	rgba_surface := surface
+	converted_surface: ^sdl.Surface
+	defer {
+		if converted_surface != nil do sdl.DestroySurface(converted_surface)
+	}
+	if surface.format != .ABGR8888 {
+		converted_surface = sdl.ConvertSurface(surface, .ABGR8888)
+		if converted_surface == nil {
+			fmt.eprintfln("ConvertSurface(ABGR8888) failed: %s", sdl.GetError())
+			return {}, false
+		}
+		rgba_surface = converted_surface
+	}
+
+	out.width = int(rgba_surface.w)
+	out.height = int(rgba_surface.h)
+
+	out.texture = sdl.CreateGPUTexture(
+		app.device,
+		{
+			type = .D2,
+			format = .R8G8B8A8_UNORM,
+			usage = {.SAMPLER},
+			width = u32(out.width),
+			height = u32(out.height),
+			layer_count_or_depth = 1,
+			num_levels = 1,
+			sample_count = ._1,
+		},
+	)
+
 	if out.texture == nil {
-		fmt.eprintfln("CreateTextureFromSurface failed: %s", sdl.GetError())
+		fmt.eprintfln("CreateGPUTexture failed: %s", sdl.GetError())
 		return {}, false
 	}
-	sdl.SetTextureScaleMode(out.texture, .NEAREST)
+
+	upload_size := int(rgba_surface.pitch) * int(rgba_surface.h)
+	tbuf := sdl.CreateGPUTransferBuffer(app.device, {usage = .UPLOAD, size = u32(upload_size)})
+
+	if tbuf == nil {
+		fmt.eprintfln("CreateGPUTransferBuffer failed: %s", sdl.GetError())
+		sdl.ReleaseGPUTexture(app.device, out.texture)
+		return {}, false
+	}
+
+	map_ptr := sdl.MapGPUTransferBuffer(app.device, tbuf, false)
+
+	if map_ptr == nil {
+		fmt.eprintfln("MapGPUTransferBuffer failed: %s", sdl.GetError())
+		sdl.ReleaseGPUTransferBuffer(app.device, tbuf)
+		sdl.ReleaseGPUTexture(app.device, out.texture)
+		return {}, false
+	}
+
+	mem.copy(map_ptr, rgba_surface.pixels, upload_size)
+	sdl.UnmapGPUTransferBuffer(app.device, tbuf)
+
+	cmd := sdl.AcquireGPUCommandBuffer(app.device)
+	if cmd == nil {
+		fmt.eprintfln("AcquireGPUCommandBuffer failed: %s", sdl.GetError())
+		sdl.ReleaseGPUTransferBuffer(app.device, tbuf)
+		sdl.ReleaseGPUTexture(app.device, out.texture)
+		return {}, false
+	}
+
+	copy_pass := sdl.BeginGPUCopyPass(cmd)
+
+	transfer := sdl.GPUTextureTransferInfo {
+		transfer_buffer = tbuf,
+		offset          = 0,
+		pixels_per_row  = u32(rgba_surface.pitch / 4), // RGBA8888 => 4 bytes/pixel
+		rows_per_layer  = u32(rgba_surface.h),
+	}
+	region := sdl.GPUTextureRegion {
+		texture   = out.texture,
+		mip_level = 0,
+		layer     = 0,
+		x         = 0,
+		y         = 0,
+		z         = 0,
+		w         = u32(rgba_surface.w),
+		h         = u32(rgba_surface.h),
+		d         = 1,
+	}
+	sdl.UploadToGPUTexture(copy_pass, transfer, region, false)
+	sdl.EndGPUCopyPass(copy_pass)
+	fence := sdl.SubmitGPUCommandBufferAndAcquireFence(cmd)
+	if fence == nil {
+		fmt.eprintfln("SubmitGPUCommandBufferAndAcquireFence (texture upload) failed: %s", sdl.GetError())
+		sdl.ReleaseGPUTransferBuffer(app.device, tbuf)
+		sdl.ReleaseGPUTexture(app.device, out.texture)
+		return {}, false
+	}
+	defer sdl.ReleaseGPUFence(app.device, fence)
+
+	if !sdl.WaitForGPUFences(app.device, true, &fence, 1) {
+		fmt.eprintfln("WaitForGPUFences (texture upload) failed: %s", sdl.GetError())
+		sdl.ReleaseGPUTransferBuffer(app.device, tbuf)
+		sdl.ReleaseGPUTexture(app.device, out.texture)
+		return {}, false
+	}
+
+	sdl.ReleaseGPUTransferBuffer(app.device, tbuf)
+
 	return out, true
 }
 
-destroy_character_data :: proc(data: ^Character_Data) {
+destroy_character_data :: proc(app: ^App, data: ^Character_Data) {
 	if data.texture != nil {
-		sdl.DestroyTexture(data.texture)
+		// Ensure no in-flight draw command is still sampling this texture.
+		if app != nil && app.device != nil {
+			_ = sdl.WaitForGPUIdle(app.device)
+		}
+		sdl.ReleaseGPUTexture(app.device, data.texture)
 	}
 	data^ = {}
 }
