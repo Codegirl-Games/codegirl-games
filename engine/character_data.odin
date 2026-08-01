@@ -36,6 +36,15 @@ Character_Data :: struct {
 	height:  int,
 }
 
+parse_char_def :: proc(file_data: []u8) -> (Char_Def, bool) {
+	def: Char_Def
+	if err := json.unmarshal(file_data, &def); err != nil {
+		fmt.eprintfln("json unmarshal failed: %v", err)
+		return {}, false
+	}
+	return def, true
+}
+
 load_character_data :: proc(app: ^App, character_json_path: string) -> (Character_Data, bool) {
 	file_data, read_err := os.read_entire_file(character_json_path, context.allocator)
 	if read_err != nil {
@@ -46,8 +55,9 @@ load_character_data :: proc(app: ^App, character_json_path: string) -> (Characte
 	defer delete(file_data)
 
 	out: Character_Data
-	if err := json.unmarshal(file_data, &out.def); err != nil {
-		fmt.eprintfln("json unmarshal failed: %v", err)
+	ok: bool
+	out.def, ok = parse_char_def(file_data)
+	if !ok {
 		return {}, false
 	}
 
