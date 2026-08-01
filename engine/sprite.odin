@@ -11,6 +11,7 @@ Sprite :: struct {
 	clip:     string,
 	frame:    int,
 	time:     f32,
+	flip_x:   bool,
 }
 
 spawn_sprite :: proc(
@@ -119,6 +120,7 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 	v0 := f32(rect[1]) / tex_h
 	u1 := f32(rect[0] + rect[2]) / tex_w
 	v1 := f32(rect[1] + rect[3]) / tex_h
+	if sprite.flip_x do u0, u1 = u1, u0
 
 	// Two triangles: (0,1,2) and (0,2,3)
 	verts := [6]Vertex {
@@ -195,4 +197,9 @@ set_sprite_clip :: proc(sprite: ^Sprite, clip: string) {
 
 sprite_quad_origin :: proc(position: Vec2, size: Vec2, pivot: [2]f32) -> Vec2 {
 	return {position.x - size.x * pivot[0], position.y - size.y * pivot[1]}
+}
+
+set_sprite_flip_x :: proc(sprite: ^Sprite, flip: bool) {
+	if sprite == nil do return
+	sprite.flip_x = flip
 }
