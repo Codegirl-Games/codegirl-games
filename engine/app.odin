@@ -248,6 +248,7 @@ shader_filenames :: proc(backend: Shader_Backend) -> (vert_name, frag_name: stri
 	}
 	return "", ""
 }
+
 create_sprite_pipeline :: proc(app: ^App) -> ^sdl.GPUGraphicsPipeline {
 	vert_name, frag_name := shader_filenames(app.shader.backend)
 	vert_path, _ := filepath.join({app.shader.shader_dir, vert_name})
