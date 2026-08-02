@@ -109,14 +109,17 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 	trim_y := f32(frame.trim_offset[1])
 	pivot := sprite.data.def.pivot
 
-	canvas_top := sprite.position.y - src_h * pivot[1]
+	viewport := Vec2{f32(app.swapchain_w), f32(app.swapchain_h)}
+	feet := world_to_screen(app.camera, sprite.position, viewport)
+
+	canvas_top := feet.y - src_h * pivot[1]
 	x0_px, y0_px: f32
 	if sprite.flip_x {
-		canvas_left := sprite.position.x - (1.0 - pivot[0]) * src_w
+		canvas_left := feet.x - (1.0 - pivot[0]) * src_w
 		x0_px = canvas_left + (src_w - trim_x - fw)
 		y0_px = canvas_top + trim_y
 	} else {
-		canvas_left := sprite.position.x - src_w * pivot[0]
+		canvas_left := feet.x - src_w * pivot[0]
 		x0_px = canvas_left + trim_x
 		y0_px = canvas_top + trim_y
 	}
@@ -147,10 +150,7 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 		{pos = p3, uv = {u0, v1}},
 	}
 
-	append(
-		&app.draw_list,
-		Queued_Sprite{texture = sprite.data.texture, verts = verts},
-	)
+	append(&app.draw_list, Queued_Sprite{texture = sprite.data.texture, verts = verts})
 }
 
 set_sprite_clip :: proc(sprite: ^Sprite, clip: string) {

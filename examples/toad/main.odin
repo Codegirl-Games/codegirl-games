@@ -39,6 +39,8 @@ main :: proc() {
 		} else {
 			eng.set_sprite_clip(&toad, "idle")
 		}
+
+		app.camera.position = toad.position - {0, 100}
 		eng.update_sprite(&toad, dt)
 
 		eng.begin_frame(&app)
