@@ -35,6 +35,7 @@ App :: struct {
 	transfer_buffer:   ^sdl.GPUTransferBuffer,
 	draw_list:         [dynamic]Queued_Sprite,
 	clear_color:       sdl.FColor,
+	camera:            Camera,
 }
 
 Shader_Backend :: enum {
@@ -123,6 +124,8 @@ init :: proc(app: ^App, title: cstring, width, height: i32) -> bool {
 	}
 
 	app.draw_list = make([dynamic]Queued_Sprite)
+
+	app.camera = camera_default()
 
 	return true
 }
