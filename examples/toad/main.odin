@@ -13,6 +13,8 @@ main :: proc() {
 	defer eng.destroy_character_data(&app, &data)
 
 	toad := eng.spawn_sprite(&data, {400, 500}, "idle", 0)
+	toad1 := eng.spawn_sprite(&data, {250, 500}, "idle", 0)
+	toad2 := eng.spawn_sprite(&data, {550, 500}, "idle", 0)
 
 	last := eng.now_seconds()
 	SPEED :: f32(200)
@@ -43,6 +45,8 @@ main :: proc() {
 
 		eng.begin_frame(&app)
 		eng.draw_sprite(&app, &toad)
+		eng.draw_sprite(&app, &toad1)
+		eng.draw_sprite(&app, &toad2)
 		eng.end_frame(&app)
 	}
 }

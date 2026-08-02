@@ -270,9 +270,13 @@ end_frame :: proc(app: ^App) {
 	app.render_pass = sdl.BeginGPURenderPass(cmd, &color_info, 1, nil)
 	sdl.BindGPUGraphicsPipeline(app.render_pass, app.pipeline)
 
-	for q, i in app.draw_list {
+	i := 0
+	for i < n {
+		run := texture_run_len(app.draw_list[:], i)
+		q0 := app.draw_list[i]
+
 		sampler_binding := sdl.GPUTextureSamplerBinding {
-			texture = q.texture,
+			texture = q0.texture,
 			sampler = app.sampler,
 		}
 		sdl.BindGPUFragmentSamplers(app.render_pass, 0, &sampler_binding, 1)
@@ -282,9 +286,11 @@ end_frame :: proc(app: ^App) {
 			offset = u32(i * SPRITE_VERTS_SIZE),
 		}
 		sdl.BindGPUVertexBuffers(app.render_pass, 0, &vb_binding, 1)
-		sdl.DrawGPUPrimitives(app.render_pass, SPRITE_VERT_COUNT, 1, 0, 0)
-	}
 
+		sdl.DrawGPUPrimitives(app.render_pass, u32(run * SPRITE_VERT_COUNT), 1, 0, 0)
+
+		i += run
+	}
 	sdl.EndGPURenderPass(app.render_pass)
 	app.render_pass = nil
 
@@ -417,4 +423,18 @@ create_sprite_pipeline :: proc(app: ^App) -> ^sdl.GPUGraphicsPipeline {
 	sdl.ReleaseGPUShader(app.device, frag)
 
 	return pipeline
+}
+
+texture_run_len :: proc(list: []Queued_Sprite, start: int) -> int {
+	if start < 0 || start >= len(list) do return 0
+
+	tex := list[start].texture
+	n := 1
+
+	for i in start + 1 ..< len(list) {
+		if list[i].texture != tex do break
+		n += 1
+	}
+
+	return n
 }
