@@ -74,13 +74,13 @@ character_clip_found_and_missing :: proc(t: ^testing.T) {
 	defer destroy_test_character(&data)
 
 	clip, ok := character_clip(&data, "idle")
-	testing.expect(t, ok)
+	testing.expect(t, ok, "character_clip should find idle")
 	testing.expect_value(t, len(clip.frames), 3)
-	testing.expect(t, clip.loop)
+	testing.expect(t, clip.loop, "idle clip should loop")
 	testing.expect_value(t, clip.fps, f32(10))
 
 	_, ok = character_clip(&data, "missing")
-	testing.expect(t, !ok)
+	testing.expect(t, !ok, "character_clip should miss unknown name")
 
 	data.def.clips["empty"] = Clip_Def {
 		loop   = true,
@@ -88,7 +88,7 @@ character_clip_found_and_missing :: proc(t: ^testing.T) {
 		frames = nil,
 	}
 	_, ok = character_clip(&data, "empty")
-	testing.expect(t, !ok)
+	testing.expect(t, !ok, "character_clip should reject empty frames")
 }
 
 @(test)
@@ -161,7 +161,7 @@ update_sprite_advances_multiple_frames :: proc(t: ^testing.T) {
 	s := spawn_sprite(&data, {}, "idle", 0)
 	update_sprite(&s, 0.25)
 	testing.expect_value(t, s.frame, 2)
-	testing.expect(t, s.time > 0.049 && s.time < 0.051)
+	testing.expect(t, s.time > 0.049 && s.time < 0.051, "leftover time after multi-frame advance should be ~0.05")
 }
 
 @(test)

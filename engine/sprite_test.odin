@@ -41,7 +41,7 @@ frame_uvs_unflipped :: proc(t: ^testing.T) {
 	testing.expect_value(t, v0, f32(0.1))
 	testing.expect_value(t, u1, f32(0.4))
 	testing.expect_value(t, v1, f32(0.3))
-	testing.expect(t, u0 < u1)
+	testing.expect(t, u0 < u1, "unflipped UVs should have u0 < u1")
 }
 
 @(test)
