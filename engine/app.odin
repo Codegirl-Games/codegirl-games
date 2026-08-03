@@ -76,6 +76,19 @@ init :: proc(app: ^App, title: cstring, width, height: i32) -> bool {
 		return false
 	}
 
+	// Prefer uncapped present for profiling; fall back if unsupported.
+	present := sdl.GPUPresentMode.VSYNC
+	if sdl.WindowSupportsGPUPresentMode(app.device, app.window, .IMMEDIATE) {
+		present = .IMMEDIATE
+	} else if sdl.WindowSupportsGPUPresentMode(app.device, app.window, .MAILBOX) {
+		present = .MAILBOX
+	}
+	if present != .VSYNC {
+		if !sdl.SetGPUSwapchainParameters(app.device, app.window, .SDR, present) {
+			fmt.eprintfln("SetGPUSwapchainParameters failed: %s", sdl.GetError())
+		}
+	}
+
 	ok: bool
 	app.shader, ok = choose_shader_runtime(app.device)
 	if !ok do return false

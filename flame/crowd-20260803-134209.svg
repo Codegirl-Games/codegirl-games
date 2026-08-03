@@ -1,0 +1,1422 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="1200" height="406" onload="init(evt)" viewBox="0 0 1200 406" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<!-- Flame graph stack visualization. See https://github.com/brendangregg/FlameGraph for latest version, and http://www.brendangregg.com/flamegraphs.html for examples. -->
+<!-- NOTES:  -->
+<defs>
+	<linearGradient id="background" y1="0" y2="1" x1="0" x2="0" >
+		<stop stop-color="#eeeeee" offset="5%" />
+		<stop stop-color="#eeeeb0" offset="95%" />
+	</linearGradient>
+</defs>
+<style type="text/css">
+	text { font-family:Verdana; font-size:12px; fill:rgb(0,0,0); }
+	#search, #ignorecase { opacity:0.1; cursor:pointer; }
+	#search:hover, #search.show, #ignorecase:hover, #ignorecase.show { opacity:1; }
+	#subtitle { text-anchor:middle; font-color:rgb(160,160,160); }
+	#title { text-anchor:middle; font-size:17px}
+	#unzoom { cursor:pointer; }
+	#frames > *:hover { stroke:black; stroke-width:0.5; cursor:pointer; }
+	.hide { display:none; }
+	.parent { opacity:0.5; }
+</style>
+<script type="text/ecmascript">
+<![CDATA[
+	"use strict";
+	var details, searchbtn, unzoombtn, matchedtxt, svg, searching, currentSearchTerm, ignorecase, ignorecaseBtn;
+	function init(evt) {
+		details = document.getElementById("details").firstChild;
+		searchbtn = document.getElementById("search");
+		ignorecaseBtn = document.getElementById("ignorecase");
+		unzoombtn = document.getElementById("unzoom");
+		matchedtxt = document.getElementById("matched");
+		svg = document.getElementsByTagName("svg")[0];
+		searching = 0;
+		currentSearchTerm = null;
+
+		// use GET parameters to restore a flamegraphs state.
+		var params = get_params();
+		if (params.x && params.y)
+			zoom(find_group(document.querySelector('[x="' + params.x + '"][y="' + params.y + '"]')));
+                if (params.s) search(params.s);
+	}
+
+	// event listeners
+	window.addEventListener("click", function(e) {
+		var target = find_group(e.target);
+		if (target) {
+			if (target.nodeName == "a") {
+				if (e.ctrlKey === false) return;
+				e.preventDefault();
+			}
+			if (target.classList.contains("parent")) unzoom(true);
+			zoom(target);
+			if (!document.querySelector('.parent')) {
+				// we have basically done a clearzoom so clear the url
+				var params = get_params();
+				if (params.x) delete params.x;
+				if (params.y) delete params.y;
+				history.replaceState(null, null, parse_params(params));
+				unzoombtn.classList.add("hide");
+				return;
+			}
+
+			// set parameters for zoom state
+			var el = target.querySelector("rect");
+			if (el && el.attributes && el.attributes.y && el.attributes._orig_x) {
+				var params = get_params()
+				params.x = el.attributes._orig_x.value;
+				params.y = el.attributes.y.value;
+				history.replaceState(null, null, parse_params(params));
+			}
+		}
+		else if (e.target.id == "unzoom") clearzoom();
+		else if (e.target.id == "search") search_prompt();
+		else if (e.target.id == "ignorecase") toggle_ignorecase();
+	}, false)
+
+	// mouse-over for info
+	// show
+	window.addEventListener("mouseover", function(e) {
+		var target = find_group(e.target);
+		if (target) details.nodeValue = "Function: " + g_to_text(target);
+	}, false)
+
+	// clear
+	window.addEventListener("mouseout", function(e) {
+		var target = find_group(e.target);
+		if (target) details.nodeValue = ' ';
+	}, false)
+
+	// ctrl-F for search
+	// ctrl-I to toggle case-sensitive search
+	window.addEventListener("keydown",function (e) {
+		if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+			e.preventDefault();
+			search_prompt();
+		}
+		else if (e.ctrlKey && e.keyCode === 73) {
+			e.preventDefault();
+			toggle_ignorecase();
+		}
+	}, false)
+
+	// functions
+	function get_params() {
+		var params = {};
+		var paramsarr = window.location.search.substr(1).split('&');
+		for (var i = 0; i < paramsarr.length; ++i) {
+			var tmp = paramsarr[i].split("=");
+			if (!tmp[0] || !tmp[1]) continue;
+			params[tmp[0]]  = decodeURIComponent(tmp[1]);
+		}
+		return params;
+	}
+	function parse_params(params) {
+		var uri = "?";
+		for (var key in params) {
+			uri += key + '=' + encodeURIComponent(params[key]) + '&';
+		}
+		if (uri.slice(-1) == "&")
+			uri = uri.substring(0, uri.length - 1);
+		if (uri == '?')
+			uri = window.location.href.split('?')[0];
+		return uri;
+	}
+	function find_child(node, selector) {
+		var children = node.querySelectorAll(selector);
+		if (children.length) return children[0];
+	}
+	function find_group(node) {
+		var parent = node.parentElement;
+		if (!parent) return;
+		if (parent.id == "frames") return node;
+		return find_group(parent);
+	}
+	function orig_save(e, attr, val) {
+		if (e.attributes["_orig_" + attr] != undefined) return;
+		if (e.attributes[attr] == undefined) return;
+		if (val == undefined) val = e.attributes[attr].value;
+		e.setAttribute("_orig_" + attr, val);
+	}
+	function orig_load(e, attr) {
+		if (e.attributes["_orig_"+attr] == undefined) return;
+		e.attributes[attr].value = e.attributes["_orig_" + attr].value;
+		e.removeAttribute("_orig_"+attr);
+	}
+	function g_to_text(e) {
+		var text = find_child(e, "title").firstChild.nodeValue;
+		return (text)
+	}
+	function g_to_func(e) {
+		var func = g_to_text(e);
+		// if there's any manipulation we want to do to the function
+		// name before it's searched, do it here before returning.
+		return (func);
+	}
+	function update_text(e) {
+		var r = find_child(e, "rect");
+		var t = find_child(e, "text");
+		var w = parseFloat(r.attributes.width.value) -3;
+		var txt = find_child(e, "title").textContent.replace(/\([^(]*\)$/,"");
+		t.attributes.x.value = parseFloat(r.attributes.x.value) + 3;
+
+		// Smaller than this size won't fit anything
+		if (w < 2 * 12 * 0.59) {
+			t.textContent = "";
+			return;
+		}
+
+		t.textContent = txt;
+		var sl = t.getSubStringLength(0, txt.length);
+		// check if only whitespace or if we can fit the entire string into width w
+		if (/^ *$/.test(txt) || sl < w)
+			return;
+
+		// this isn't perfect, but gives a good starting point
+		// and avoids calling getSubStringLength too often
+		var start = Math.floor((w/sl) * txt.length);
+		for (var x = start; x > 0; x = x-2) {
+			if (t.getSubStringLength(0, x + 2) <= w) {
+				t.textContent = txt.substring(0, x) + "..";
+				return;
+			}
+		}
+		t.textContent = "";
+	}
+
+	// zoom
+	function zoom_reset(e) {
+		if (e.attributes != undefined) {
+			orig_load(e, "x");
+			orig_load(e, "width");
+		}
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_reset(c[i]);
+		}
+	}
+	function zoom_child(e, x, ratio) {
+		if (e.attributes != undefined) {
+			if (e.attributes.x != undefined) {
+				orig_save(e, "x");
+				e.attributes.x.value = (parseFloat(e.attributes.x.value) - x - 10) * ratio + 10;
+				if (e.tagName == "text")
+					e.attributes.x.value = find_child(e.parentNode, "rect[x]").attributes.x.value + 3;
+			}
+			if (e.attributes.width != undefined) {
+				orig_save(e, "width");
+				e.attributes.width.value = parseFloat(e.attributes.width.value) * ratio;
+			}
+		}
+
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_child(c[i], x - 10, ratio);
+		}
+	}
+	function zoom_parent(e) {
+		if (e.attributes) {
+			if (e.attributes.x != undefined) {
+				orig_save(e, "x");
+				e.attributes.x.value = 10;
+			}
+			if (e.attributes.width != undefined) {
+				orig_save(e, "width");
+				e.attributes.width.value = parseInt(svg.width.baseVal.value) - (10 * 2);
+			}
+		}
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_parent(c[i]);
+		}
+	}
+	function zoom(node) {
+		var attr = find_child(node, "rect").attributes;
+		var width = parseFloat(attr.width.value);
+		var xmin = parseFloat(attr.x.value);
+		var xmax = parseFloat(xmin + width);
+		var ymin = parseFloat(attr.y.value);
+		var ratio = (svg.width.baseVal.value - 2 * 10) / width;
+
+		// XXX: Workaround for JavaScript float issues (fix me)
+		var fudge = 0.0001;
+
+		unzoombtn.classList.remove("hide");
+
+		var el = document.getElementById("frames").children;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			var a = find_child(e, "rect").attributes;
+			var ex = parseFloat(a.x.value);
+			var ew = parseFloat(a.width.value);
+			var upstack;
+			// Is it an ancestor
+			if (0 == 0) {
+				upstack = parseFloat(a.y.value) > ymin;
+			} else {
+				upstack = parseFloat(a.y.value) < ymin;
+			}
+			if (upstack) {
+				// Direct ancestor
+				if (ex <= xmin && (ex+ew+fudge) >= xmax) {
+					e.classList.add("parent");
+					zoom_parent(e);
+					update_text(e);
+				}
+				// not in current path
+				else
+					e.classList.add("hide");
+			}
+			// Children maybe
+			else {
+				// no common path
+				if (ex < xmin || ex + fudge >= xmax) {
+					e.classList.add("hide");
+				}
+				else {
+					zoom_child(e, xmin, ratio);
+					update_text(e);
+				}
+			}
+		}
+		search();
+	}
+	function unzoom(dont_update_text) {
+		unzoombtn.classList.add("hide");
+		var el = document.getElementById("frames").children;
+		for(var i = 0; i < el.length; i++) {
+			el[i].classList.remove("parent");
+			el[i].classList.remove("hide");
+			zoom_reset(el[i]);
+			if(!dont_update_text) update_text(el[i]);
+		}
+		search();
+	}
+	function clearzoom() {
+		unzoom();
+
+		// remove zoom state
+		var params = get_params();
+		if (params.x) delete params.x;
+		if (params.y) delete params.y;
+		history.replaceState(null, null, parse_params(params));
+	}
+
+	// search
+	function toggle_ignorecase() {
+		ignorecase = !ignorecase;
+		if (ignorecase) {
+			ignorecaseBtn.classList.add("show");
+		} else {
+			ignorecaseBtn.classList.remove("show");
+		}
+		reset_search();
+		search();
+	}
+	function reset_search() {
+		var el = document.querySelectorAll("#frames rect");
+		for (var i = 0; i < el.length; i++) {
+			orig_load(el[i], "fill")
+		}
+		var params = get_params();
+		delete params.s;
+		history.replaceState(null, null, parse_params(params));
+	}
+	function search_prompt() {
+		if (!searching) {
+			var term = prompt("Enter a search term (regexp " +
+			    "allowed, eg: ^ext4_)"
+			    + (ignorecase ? ", ignoring case" : "")
+			    + "\nPress Ctrl-i to toggle case sensitivity", "");
+			if (term != null) search(term);
+		} else {
+			reset_search();
+			searching = 0;
+			currentSearchTerm = null;
+			searchbtn.classList.remove("show");
+			searchbtn.firstChild.nodeValue = "Search"
+			matchedtxt.classList.add("hide");
+			matchedtxt.firstChild.nodeValue = ""
+		}
+	}
+	function search(term) {
+		if (term) currentSearchTerm = term;
+		if (currentSearchTerm === null) return;
+
+		var re = new RegExp(currentSearchTerm, ignorecase ? 'i' : '');
+		var el = document.getElementById("frames").children;
+		var matches = new Object();
+		var maxwidth = 0;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			var func = g_to_func(e);
+			var rect = find_child(e, "rect");
+			if (func == null || rect == null)
+				continue;
+
+			// Save max width. Only works as we have a root frame
+			var w = parseFloat(rect.attributes.width.value);
+			if (w > maxwidth)
+				maxwidth = w;
+
+			if (func.match(re)) {
+				// highlight
+				var x = parseFloat(rect.attributes.x.value);
+				orig_save(rect, "fill");
+				rect.attributes.fill.value = "rgb(230,0,230)";
+
+				// remember matches
+				if (matches[x] == undefined) {
+					matches[x] = w;
+				} else {
+					if (w > matches[x]) {
+						// overwrite with parent
+						matches[x] = w;
+					}
+				}
+				searching = 1;
+			}
+		}
+		if (!searching)
+			return;
+		var params = get_params();
+		params.s = currentSearchTerm;
+		history.replaceState(null, null, parse_params(params));
+
+		searchbtn.classList.add("show");
+		searchbtn.firstChild.nodeValue = "Reset Search";
+
+		// calculate percent matched, excluding vertical overlap
+		var count = 0;
+		var lastx = -1;
+		var lastw = 0;
+		var keys = Array();
+		for (k in matches) {
+			if (matches.hasOwnProperty(k))
+				keys.push(k);
+		}
+		// sort the matched frames by their x location
+		// ascending, then width descending
+		keys.sort(function(a, b){
+			return a - b;
+		});
+		// Step through frames saving only the biggest bottom-up frames
+		// thanks to the sort order. This relies on the tree property
+		// where children are always smaller than their parents.
+		var fudge = 0.0001;	// JavaScript floating point
+		for (var k in keys) {
+			var x = parseFloat(keys[k]);
+			var w = matches[keys[k]];
+			if (x >= lastx + lastw - fudge) {
+				count += w;
+				lastx = x;
+				lastw = w;
+			}
+		}
+		// display matched percent
+		matchedtxt.classList.remove("hide");
+		var pct = 100 * count / maxwidth;
+		if (pct != 100) pct = pct.toFixed(1)
+		matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";
+	}
+]]>
+</script>
+<rect x="0.0" y="0" width="1200.0" height="406.0" fill="url(#background)"  />
+<text id="title" x="600.00" y="24" >Flame Graph</text>
+<text id="details" x="10.00" y="389" > </text>
+<text id="unzoom" x="10.00" y="24" class="hide">Reset Zoom</text>
+<text id="search" x="1090.00" y="24" >Search</text>
+<text id="ignorecase" x="1174.00" y="24" >ic</text>
+<text id="matched" x="1090.00" y="389" > </text>
+<g id="frames">
+<g >
+<title>runtime::map_seed_from_map_data (9,808,533 samples, 0.43%)</title><rect x="1061.4" y="213" width="5.0" height="15.0" fill="rgb(205,0,0)" rx="2" ry="2" />
+<text  x="1064.42" y="223.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (8,945,344 samples, 0.39%)</title><rect x="895.3" y="197" width="4.6" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="898.32" y="207.5" ></text>
+</g>
+<g >
+<title> (12,615,968 samples, 0.55%)</title><rect x="625.8" y="213" width="6.4" height="15.0" fill="rgb(232,128,30)" rx="2" ry="2" />
+<text  x="628.75" y="223.5" ></text>
+</g>
+<g >
+<title>[unknown] (34,420,931 samples, 1.49%)</title><rect x="1172.4" y="293" width="17.6" height="15.0" fill="rgb(210,24,5)" rx="2" ry="2" />
+<text  x="1175.38" y="303.5" ></text>
+</g>
+<g >
+<title>[libdbus-1.so.3.38.3] (8,322,227 samples, 0.36%)</title><rect x="946.7" y="165" width="4.3" height="15.0" fill="rgb(232,125,29)" rx="2" ry="2" />
+<text  x="949.73" y="175.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (5,362,571 samples, 0.23%)</title><rect x="95.1" y="309" width="2.7" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="98.09" y="319.5" ></text>
+</g>
+<g >
+<title>engine::world_to_screen (53,829,542 samples, 2.34%)</title><rect x="598.2" y="229" width="27.6" height="15.0" fill="rgb(250,209,50)" rx="2" ry="2" />
+<text  x="601.19" y="239.5" >e..</text>
+</g>
+<g >
+<title>[libdbus-1.so.3.38.3] (12,070,161 samples, 0.52%)</title><rect x="960.0" y="181" width="6.1" height="15.0" fill="rgb(232,125,29)" rx="2" ry="2" />
+<text  x="962.95" y="191.5" ></text>
+</g>
+<g >
+<title>ZSTD_decompressBlock_internal (19,472,565 samples, 0.84%)</title><rect x="97.8" y="85" width="10.0" height="15.0" fill="rgb(245,186,44)" rx="2" ry="2" />
+<text  x="100.85" y="95.5" ></text>
+</g>
+<g >
+<title>runtime::string_eq (28,097,449 samples, 1.22%)</title><rect x="464.8" y="197" width="14.4" height="15.0" fill="rgb(248,198,47)" rx="2" ry="2" />
+<text  x="467.82" y="207.5" ></text>
+</g>
+<g >
+<title>ZSTD_decompressBlock_internal (19,472,565 samples, 0.84%)</title><rect x="97.8" y="101" width="10.0" height="15.0" fill="rgb(245,186,44)" rx="2" ry="2" />
+<text  x="100.85" y="111.5" ></text>
+</g>
+<g >
+<title>drmIoctl (8,837,727 samples, 0.38%)</title><rect x="786.5" y="117" width="4.6" height="15.0" fill="rgb(251,215,51)" rx="2" ry="2" />
+<text  x="789.54" y="127.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (248,472,422 samples, 10.78%)</title><rect x="149.3" y="229" width="127.2" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="152.29" y="239.5" >[libSDL3.so.0.4..</text>
+</g>
+<g >
+<title>drmIoctl (8,908,105 samples, 0.39%)</title><rect x="828.5" y="149" width="4.6" height="15.0" fill="rgb(251,215,51)" rx="2" ry="2" />
+<text  x="831.53" y="159.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (22,142,026 samples, 0.96%)</title><rect x="265.2" y="117" width="11.3" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="268.16" y="127.5" ></text>
+</g>
+<g >
+<title>_dl_catch_exception (13,749,101 samples, 0.60%)</title><rect x="82.3" y="165" width="7.1" height="15.0" fill="rgb(253,223,53)" rx="2" ry="2" />
+<text  x="85.32" y="175.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (7,083,687 samples, 0.31%)</title><rect x="1123.0" y="101" width="3.6" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1126.00" y="111.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (101,218,065 samples, 4.39%)</title><rect x="1066.4" y="277" width="51.9" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="1069.44" y="287.5" >[libS..</text>
+</g>
+<g >
+<title>__libc_start_main (1,863,105,327 samples, 80.84%)</title><rect x="112.5" y="309" width="953.9" height="15.0" fill="rgb(236,142,34)" rx="2" ry="2" />
+<text  x="115.50" y="319.5" >__libc_start_main</text>
+</g>
+<g >
+<title>runtime::default_hasher_string (15,283,482 samples, 0.66%)</title><rect x="447.7" y="197" width="7.8" height="15.0" fill="rgb(228,106,25)" rx="2" ry="2" />
+<text  x="450.65" y="207.5" ></text>
+</g>
+<g >
+<title>[libffi.so.8.4.1] (9,419,443 samples, 0.41%)</title><rect x="67.5" y="181" width="4.8" height="15.0" fill="rgb(207,9,2)" rx="2" ry="2" />
+<text  x="70.49" y="191.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (23,176,075 samples, 1.01%)</title><rect x="682.9" y="149" width="11.9" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="685.94" y="159.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (24,896,667 samples, 1.08%)</title><rect x="95.1" y="325" width="12.7" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="98.09" y="335.5" ></text>
+</g>
+<g >
+<title>__vdso_clock_gettime (10,798,003 samples, 0.47%)</title><rect x="800.5" y="133" width="5.5" height="15.0" fill="rgb(254,226,54)" rx="2" ry="2" />
+<text  x="803.48" y="143.5" ></text>
+</g>
+<g >
+<title>[libdbus-1.so.3.38.3] (36,219,571 samples, 1.57%)</title><rect x="941.4" y="197" width="18.6" height="15.0" fill="rgb(232,125,29)" rx="2" ry="2" />
+<text  x="944.41" y="207.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (16,323,788 samples, 0.71%)</title><rect x="1118.3" y="117" width="8.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1121.27" y="127.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (17,801,997 samples, 0.77%)</title><rect x="740.2" y="133" width="9.1" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="743.22" y="143.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (32,952,716 samples, 1.43%)</title><rect x="779.3" y="149" width="16.9" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="782.32" y="159.5" ></text>
+</g>
+<g >
+<title>[ld-linux-x86-64.so.2] (13,749,101 samples, 0.60%)</title><rect x="82.3" y="261" width="7.1" height="15.0" fill="rgb(243,178,42)" rx="2" ry="2" />
+<text  x="85.32" y="271.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (16,323,788 samples, 0.71%)</title><rect x="1118.3" y="245" width="8.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1121.27" y="255.5" ></text>
+</g>
+<g >
+<title>[libGLX_nvidia.so.610.43.03] (11,186,482 samples, 0.49%)</title><rect x="89.4" y="261" width="5.7" height="15.0" fill="rgb(253,221,53)" rx="2" ry="2" />
+<text  x="92.36" y="271.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (11,166,508 samples, 0.48%)</title><rect x="230.0" y="133" width="5.7" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="233.03" y="143.5" ></text>
+</g>
+<g >
+<title>[libwayland-client.so.0.25.0] (19,548,059 samples, 0.85%)</title><rect x="881.0" y="149" width="10.0" height="15.0" fill="rgb(205,1,0)" rx="2" ry="2" />
+<text  x="883.96" y="159.5" ></text>
+</g>
+<g >
+<title>clock_gettime (19,166,825 samples, 0.83%)</title><rect x="806.0" y="133" width="9.8" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
+<text  x="809.01" y="143.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (16,323,788 samples, 0.71%)</title><rect x="1118.3" y="277" width="8.3" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="1121.27" y="287.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (16,323,788 samples, 0.71%)</title><rect x="1118.3" y="181" width="8.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1121.27" y="191.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (529,290 samples, 0.02%)</title><rect x="880.7" y="133" width="0.3" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="883.69" y="143.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (37,377,516 samples, 1.62%)</title><rect x="922.3" y="197" width="19.1" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="925.27" y="207.5" ></text>
+</g>
+<g >
+<title>engine::sprite_feet_quad (76,023,642 samples, 3.30%)</title><rect x="494.3" y="229" width="38.9" height="15.0" fill="rgb(212,35,8)" rx="2" ry="2" />
+<text  x="497.26" y="239.5" >eng..</text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (19,922,411 samples, 0.86%)</title><rect x="1108.1" y="101" width="10.2" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1111.07" y="111.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (15,401,952 samples, 0.67%)</title><rect x="59.6" y="261" width="7.9" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="62.60" y="271.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (1,863,105,327 samples, 80.84%)</title><rect x="112.5" y="293" width="953.9" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="115.50" y="303.5" >[libc.so.6]</text>
+</g>
+<g >
+<title>runtime::default_hasher (15,283,482 samples, 0.66%)</title><rect x="447.7" y="181" width="7.8" height="15.0" fill="rgb(224,90,21)" rx="2" ry="2" />
+<text  x="450.65" y="191.5" ></text>
+</g>
+<g >
+<title>[unknown] (34,420,931 samples, 1.49%)</title><rect x="1172.4" y="309" width="17.6" height="15.0" fill="rgb(210,24,5)" rx="2" ry="2" />
+<text  x="1175.38" y="319.5" ></text>
+</g>
+<g >
+<title>[ld-linux-x86-64.so.2] (13,749,101 samples, 0.60%)</title><rect x="82.3" y="213" width="7.1" height="15.0" fill="rgb(243,178,42)" rx="2" ry="2" />
+<text  x="85.32" y="223.5" ></text>
+</g>
+<g >
+<title>engine::texture_run_len (33,938,731 samples, 1.47%)</title><rect x="899.9" y="229" width="17.4" height="15.0" fill="rgb(232,126,30)" rx="2" ry="2" />
+<text  x="902.90" y="239.5" ></text>
+</g>
+<g >
+<title>[libvulkan.so.1.4.350] (24,935,583 samples, 1.08%)</title><rect x="82.3" y="309" width="12.8" height="15.0" fill="rgb(238,155,37)" rx="2" ry="2" />
+<text  x="85.32" y="319.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (15,948,532 samples, 0.69%)</title><rect x="674.8" y="165" width="8.1" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="677.77" y="175.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (73,168,487 samples, 3.17%)</title><rect x="1080.8" y="229" width="37.5" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1083.81" y="239.5" >[li..</text>
+</g>
+<g >
+<title>engine::end_frame (566,496,889 samples, 24.58%)</title><rect x="632.2" y="245" width="290.1" height="15.0" fill="rgb(243,175,42)" rx="2" ry="2" />
+<text  x="635.21" y="255.5" >engine::end_frame</text>
+</g>
+<g >
+<title>[libvulkan.so.1.4.350] (24,935,583 samples, 1.08%)</title><rect x="82.3" y="325" width="12.8" height="15.0" fill="rgb(238,155,37)" rx="2" ry="2" />
+<text  x="85.32" y="335.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (10,043,080 samples, 0.44%)</title><rect x="1014.1" y="213" width="5.1" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="1017.10" y="223.5" ></text>
+</g>
+<g >
+<title>engine::events (85,667,248 samples, 3.72%)</title><rect x="922.3" y="245" width="43.8" height="15.0" fill="rgb(224,89,21)" rx="2" ry="2" />
+<text  x="925.27" y="255.5" >engi..</text>
+</g>
+<g >
+<title>[libc.so.6] (20,182,358 samples, 0.88%)</title><rect x="420.7" y="229" width="10.3" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="423.66" y="239.5" ></text>
+</g>
+<g >
+<title>[libxkbcommon.so.0.13.2] (9,419,443 samples, 0.41%)</title><rect x="67.5" y="37" width="4.8" height="15.0" fill="rgb(246,190,45)" rx="2" ry="2" />
+<text  x="70.49" y="47.5" ></text>
+</g>
+<g >
+<title>[unknown] (8,837,727 samples, 0.38%)</title><rect x="786.5" y="85" width="4.6" height="15.0" fill="rgb(210,24,5)" rx="2" ry="2" />
+<text  x="789.54" y="95.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (256,944,786 samples, 11.15%)</title><rect x="759.4" y="197" width="131.6" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="762.41" y="207.5" >[libvulkan_radeo..</text>
+</g>
+<g >
+<title>wl_display_dispatch_queue_pending (17,093,349 samples, 0.74%)</title><rect x="837.6" y="181" width="8.8" height="15.0" fill="rgb(234,136,32)" rx="2" ry="2" />
+<text  x="840.60" y="191.5" ></text>
+</g>
+<g >
+<title>[unknown] (8,908,105 samples, 0.39%)</title><rect x="828.5" y="117" width="4.6" height="15.0" fill="rgb(210,24,5)" rx="2" ry="2" />
+<text  x="831.53" y="127.5" ></text>
+</g>
+<g >
+<title>[ld-linux-x86-64.so.2] (3,803,258 samples, 0.17%)</title><rect x="82.3" y="133" width="2.0" height="15.0" fill="rgb(243,178,42)" rx="2" ry="2" />
+<text  x="85.32" y="143.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (85,667,248 samples, 3.72%)</title><rect x="922.3" y="229" width="43.8" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="925.27" y="239.5" >[lib..</text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (36,750,053 samples, 1.59%)</title><rect x="154.0" y="181" width="18.9" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="157.05" y="191.5" ></text>
+</g>
+<g >
+<title>ioctl (8,837,727 samples, 0.38%)</title><rect x="786.5" y="101" width="4.6" height="15.0" fill="rgb(231,122,29)" rx="2" ry="2" />
+<text  x="789.54" y="111.5" ></text>
+</g>
+<g >
+<title>__$map_get$$map[string]engine::Clip_Def (43,386,648 samples, 1.88%)</title><rect x="1039.2" y="213" width="22.2" height="15.0" fill="rgb(211,32,7)" rx="2" ry="2" />
+<text  x="1042.21" y="223.5" >_..</text>
+</g>
+<g >
+<title>wl_proxy_marshal_flags (87,140,950 samples, 3.78%)</title><rect x="846.4" y="181" width="44.6" height="15.0" fill="rgb(224,90,21)" rx="2" ry="2" />
+<text  x="849.35" y="191.5" >wl_p..</text>
+</g>
+<g >
+<title>wl_display_prepare_read_queue (18,247,640 samples, 0.79%)</title><rect x="819.2" y="133" width="9.3" height="15.0" fill="rgb(236,144,34)" rx="2" ry="2" />
+<text  x="822.19" y="143.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (10,497,692 samples, 0.46%)</title><rect x="1112.9" y="85" width="5.4" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1115.89" y="95.5" ></text>
+</g>
+<g >
+<title>vk_icdNegotiateLoaderICDInterfaceVersion (11,186,482 samples, 0.49%)</title><rect x="89.4" y="293" width="5.7" height="15.0" fill="rgb(233,131,31)" rx="2" ry="2" />
+<text  x="92.36" y="303.5" ></text>
+</g>
+<g >
+<title>drmSyncobjTimelineWait (8,837,727 samples, 0.38%)</title><rect x="786.5" y="133" width="4.6" height="15.0" fill="rgb(241,167,40)" rx="2" ry="2" />
+<text  x="789.54" y="143.5" ></text>
+</g>
+<g >
+<title>ZSTD_decompressSequences (19,472,565 samples, 0.84%)</title><rect x="97.8" y="69" width="10.0" height="15.0" fill="rgb(220,72,17)" rx="2" ry="2" />
+<text  x="100.85" y="79.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (19,472,565 samples, 0.84%)</title><rect x="97.8" y="277" width="10.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="100.85" y="287.5" ></text>
+</g>
+<g >
+<title>_start (1,863,105,327 samples, 80.84%)</title><rect x="112.5" y="325" width="953.9" height="15.0" fill="rgb(245,185,44)" rx="2" ry="2" />
+<text  x="115.50" y="335.5" >_start</text>
+</g>
+<g >
+<title>wl_cursor_surfa (123,769,661 samples, 5.37%)</title><rect x="1126.6" y="341" width="63.4" height="15.0" fill="rgb(221,73,17)" rx="2" ry="2" />
+<text  x="1129.63" y="351.5" >wl_cur..</text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (16,323,788 samples, 0.71%)</title><rect x="1118.3" y="133" width="8.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1121.27" y="143.5" ></text>
+</g>
+<g >
+<title>runtime::string_eq (27,030,449 samples, 1.17%)</title><rect x="1047.6" y="197" width="13.8" height="15.0" fill="rgb(248,198,47)" rx="2" ry="2" />
+<text  x="1050.58" y="207.5" ></text>
+</g>
+<g >
+<title>[libdbus-1.so.3.38.3] (12,070,161 samples, 0.52%)</title><rect x="960.0" y="165" width="6.1" height="15.0" fill="rgb(232,125,29)" rx="2" ry="2" />
+<text  x="962.95" y="175.5" ></text>
+</g>
+<g >
+<title>pthread_rwlock_rdlock (10,022,896 samples, 0.43%)</title><rect x="791.1" y="133" width="5.1" height="15.0" fill="rgb(251,214,51)" rx="2" ry="2" />
+<text  x="794.06" y="143.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (33,390,206 samples, 1.45%)</title><rect x="1101.2" y="117" width="17.1" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1104.17" y="127.5" ></text>
+</g>
+<g >
+<title>[libdbus-1.so.3.38.3] (8,322,227 samples, 0.36%)</title><rect x="946.7" y="149" width="4.3" height="15.0" fill="rgb(232,125,29)" rx="2" ry="2" />
+<text  x="949.73" y="159.5" ></text>
+</g>
+<g >
+<title>pthread_mutex_lock (27,921,910 samples, 1.21%)</title><rect x="172.9" y="181" width="14.3" height="15.0" fill="rgb(247,196,46)" rx="2" ry="2" />
+<text  x="175.87" y="191.5" ></text>
+</g>
+<g >
+<title>wl_display_dispatch_queue_timeout (43,987,036 samples, 1.91%)</title><rect x="806.0" y="149" width="22.5" height="15.0" fill="rgb(214,45,10)" rx="2" ry="2" />
+<text  x="809.01" y="159.5" >w..</text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (14,071,005 samples, 0.61%)</title><rect x="779.3" y="133" width="7.2" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="782.33" y="143.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (16,323,788 samples, 0.71%)</title><rect x="1118.3" y="229" width="8.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1121.27" y="239.5" ></text>
+</g>
+<g >
+<title>[unknown] (8,837,727 samples, 0.38%)</title><rect x="786.5" y="69" width="4.6" height="15.0" fill="rgb(210,24,5)" rx="2" ry="2" />
+<text  x="789.54" y="79.5" ></text>
+</g>
+<g >
+<title>engine::to_clip (126,952,057 samples, 5.51%)</title><rect x="533.2" y="229" width="65.0" height="15.0" fill="rgb(225,93,22)" rx="2" ry="2" />
+<text  x="536.19" y="239.5" >engine:..</text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (19,534,096 samples, 0.85%)</title><rect x="97.8" y="309" width="10.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="100.83" y="319.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (248,472,422 samples, 10.78%)</title><rect x="149.3" y="213" width="127.2" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="152.29" y="223.5" >[libSDL3.so.0.4..</text>
+</g>
+<g >
+<title>__close (22,142,026 samples, 0.96%)</title><rect x="265.2" y="149" width="11.3" height="15.0" fill="rgb(236,145,34)" rx="2" ry="2" />
+<text  x="268.16" y="159.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (121,561,671 samples, 5.27%)</title><rect x="10.1" y="309" width="62.2" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="13.07" y="319.5" >[libSD..</text>
+</g>
+<g >
+<title>[libwayland-client.so.0.25.0] (9,419,443 samples, 0.41%)</title><rect x="67.5" y="229" width="4.8" height="15.0" fill="rgb(205,1,0)" rx="2" ry="2" />
+<text  x="70.49" y="239.5" ></text>
+</g>
+<g >
+<title>engine::end_frame (101,218,065 samples, 4.39%)</title><rect x="1066.4" y="309" width="51.9" height="15.0" fill="rgb(243,175,42)" rx="2" ry="2" />
+<text  x="1069.44" y="319.5" >engin..</text>
+</g>
+<g >
+<title>[libxkbcommon.so.0.13.2] (9,419,443 samples, 0.41%)</title><rect x="67.5" y="85" width="4.8" height="15.0" fill="rgb(246,190,45)" rx="2" ry="2" />
+<text  x="70.49" y="95.5" ></text>
+</g>
+<g >
+<title>crowd_perf (2,180,827,058 samples, 94.63%)</title><rect x="10.0" y="341" width="1116.6" height="15.0" fill="rgb(220,72,17)" rx="2" ry="2" />
+<text  x="13.01" y="351.5" >crowd_perf</text>
+</g>
+<g >
+<title>wl_display_cancel_read (10,863,380 samples, 0.47%)</title><rect x="935.8" y="181" width="5.6" height="15.0" fill="rgb(231,122,29)" rx="2" ry="2" />
+<text  x="938.84" y="191.5" ></text>
+</g>
+<g >
+<title>wl_proxy_marshal_array_flags (59,213,870 samples, 2.57%)</title><rect x="860.7" y="165" width="30.3" height="15.0" fill="rgb(253,222,53)" rx="2" ry="2" />
+<text  x="863.65" y="175.5" >wl..</text>
+</g>
+<g >
+<title>[libwayland-client.so.0.25.0] (9,227,117 samples, 0.40%)</title><rect x="837.6" y="165" width="4.7" height="15.0" fill="rgb(205,1,0)" rx="2" ry="2" />
+<text  x="840.60" y="175.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (2,008,651 samples, 0.09%)</title><rect x="748.3" y="117" width="1.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="751.30" y="127.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (152,668,587 samples, 6.62%)</title><rect x="759.4" y="181" width="78.2" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="762.43" y="191.5" >[libvulka..</text>
+</g>
+<g >
+<title>[libnvidia-glcore.so.610.43.03] (9,945,843 samples, 0.43%)</title><rect x="84.3" y="69" width="5.1" height="15.0" fill="rgb(235,141,33)" rx="2" ry="2" />
+<text  x="87.27" y="79.5" ></text>
+</g>
+<g >
+<title>wl_display_cancel_read (6,572,571 samples, 0.29%)</title><rect x="815.8" y="133" width="3.4" height="15.0" fill="rgb(231,122,29)" rx="2" ry="2" />
+<text  x="818.82" y="143.5" ></text>
+</g>
+<g >
+<title>engine::character_clip (126,505,162 samples, 5.49%)</title><rect x="1001.7" y="229" width="64.7" height="15.0" fill="rgb(213,36,8)" rx="2" ry="2" />
+<text  x="1004.67" y="239.5" >engine:..</text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (267,487,926 samples, 11.61%)</title><rect x="754.0" y="213" width="137.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="757.01" y="223.5" >[libvulkan_radeon..</text>
+</g>
+<g >
+<title>[ld-linux-x86-64.so.2] (3,803,258 samples, 0.17%)</title><rect x="82.3" y="117" width="2.0" height="15.0" fill="rgb(243,178,42)" rx="2" ry="2" />
+<text  x="85.32" y="127.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (2,008,651 samples, 0.09%)</title><rect x="748.3" y="101" width="1.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="751.30" y="111.5" ></text>
+</g>
+<g >
+<title>[libzstd.so.1.5.7] (19,472,565 samples, 0.84%)</title><rect x="97.8" y="117" width="10.0" height="15.0" fill="rgb(226,100,23)" rx="2" ry="2" />
+<text  x="100.85" y="127.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (39,593,833 samples, 1.72%)</title><rect x="240.1" y="101" width="20.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="243.13" y="111.5" ></text>
+</g>
+<g >
+<title>[ld-linux-x86-64.so.2] (13,749,101 samples, 0.60%)</title><rect x="82.3" y="149" width="7.1" height="15.0" fill="rgb(243,178,42)" rx="2" ry="2" />
+<text  x="85.32" y="159.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (18,253,598 samples, 0.79%)</title><rect x="926.5" y="181" width="9.3" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="929.50" y="191.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (10,543,140 samples, 0.46%)</title><rect x="754.0" y="197" width="5.4" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="757.01" y="207.5" ></text>
+</g>
+<g >
+<title>[libGLX_nvidia.so.610.43.03] (9,945,843 samples, 0.43%)</title><rect x="84.3" y="133" width="5.1" height="15.0" fill="rgb(253,221,53)" rx="2" ry="2" />
+<text  x="87.27" y="143.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (15,948,532 samples, 0.69%)</title><rect x="674.8" y="181" width="8.1" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="677.77" y="191.5" ></text>
+</g>
+<g >
+<title>ZSTD_decompress (19,472,565 samples, 0.84%)</title><rect x="97.8" y="149" width="10.0" height="15.0" fill="rgb(243,175,41)" rx="2" ry="2" />
+<text  x="100.85" y="159.5" ></text>
+</g>
+<g >
+<title>[libwayland-client.so.0.25.0] (9,419,443 samples, 0.41%)</title><rect x="67.5" y="213" width="4.8" height="15.0" fill="rgb(205,1,0)" rx="2" ry="2" />
+<text  x="70.49" y="223.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (124,446,724 samples, 5.40%)</title><rect x="764.8" y="165" width="63.7" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="767.81" y="175.5" >[libvu..</text>
+</g>
+<g >
+<title>runtime::default_hasher_string (29,573,324 samples, 1.28%)</title><rect x="1024.1" y="197" width="15.1" height="15.0" fill="rgb(228,106,25)" rx="2" ry="2" />
+<text  x="1027.07" y="207.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (166,540,699 samples, 7.23%)</title><rect x="191.2" y="181" width="85.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="194.24" y="191.5" >[libvulkan..</text>
+</g>
+<g >
+<title>[libc.so.6] (9,678,980 samples, 0.42%)</title><rect x="1085.2" y="149" width="5.0" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="1088.24" y="159.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (54,895,138 samples, 2.38%)</title><rect x="39.4" y="277" width="28.1" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="42.38" y="287.5" >[..</text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (112,142,228 samples, 4.87%)</title><rect x="10.1" y="293" width="57.4" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="13.07" y="303.5" >[libSD..</text>
+</g>
+<g >
+<title>clock_gettime (9,278,804 samples, 0.40%)</title><rect x="260.4" y="117" width="4.8" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
+<text  x="263.40" y="127.5" ></text>
+</g>
+<g >
+<title>drmSyncobjReset (8,908,105 samples, 0.39%)</title><rect x="828.5" y="165" width="4.6" height="15.0" fill="rgb(247,194,46)" rx="2" ry="2" />
+<text  x="831.53" y="175.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (16,323,788 samples, 0.71%)</title><rect x="1118.3" y="165" width="8.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1121.27" y="175.5" ></text>
+</g>
+<g >
+<title>engine::character_frame (104,566,099 samples, 4.54%)</title><rect x="431.0" y="229" width="53.5" height="15.0" fill="rgb(223,85,20)" rx="2" ry="2" />
+<text  x="433.99" y="239.5" >engin..</text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (19,472,565 samples, 0.84%)</title><rect x="97.8" y="197" width="10.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="100.85" y="207.5" ></text>
+</g>
+<g >
+<title>__$hasher$$string (38,999,318 samples, 1.69%)</title><rect x="1019.2" y="213" width="20.0" height="15.0" fill="rgb(253,223,53)" rx="2" ry="2" />
+<text  x="1022.24" y="223.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (19,472,565 samples, 0.84%)</title><rect x="97.8" y="261" width="10.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="100.85" y="271.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (12,154,689 samples, 0.53%)</title><rect x="884.7" y="133" width="6.3" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="887.75" y="143.5" ></text>
+</g>
+<g >
+<title>engine::frame_uvs (19,004,694 samples, 0.82%)</title><rect x="484.5" y="229" width="9.8" height="15.0" fill="rgb(241,166,39)" rx="2" ry="2" />
+<text  x="487.53" y="239.5" ></text>
+</g>
+<g >
+<title>[unknown] (8,908,105 samples, 0.39%)</title><rect x="828.5" y="101" width="4.6" height="15.0" fill="rgb(210,24,5)" rx="2" ry="2" />
+<text  x="831.53" y="111.5" ></text>
+</g>
+<g >
+<title>pthread_mutex_lock (12,070,161 samples, 0.52%)</title><rect x="960.0" y="149" width="6.1" height="15.0" fill="rgb(247,196,46)" rx="2" ry="2" />
+<text  x="962.95" y="159.5" ></text>
+</g>
+<g >
+<title>[libwayland-client.so.0.25.0] (27,927,080 samples, 1.21%)</title><rect x="846.4" y="165" width="14.3" height="15.0" fill="rgb(205,1,0)" rx="2" ry="2" />
+<text  x="849.35" y="175.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (101,218,065 samples, 4.39%)</title><rect x="1066.4" y="245" width="51.9" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1069.44" y="255.5" >[libv..</text>
+</g>
+<g >
+<title>ioctl (8,908,105 samples, 0.39%)</title><rect x="828.5" y="133" width="4.6" height="15.0" fill="rgb(231,122,29)" rx="2" ry="2" />
+<text  x="831.53" y="143.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (16,323,788 samples, 0.71%)</title><rect x="1118.3" y="197" width="8.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1121.27" y="207.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (11,820,981 samples, 0.51%)</title><rect x="270.4" y="101" width="6.1" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="273.45" y="111.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (46,049,761 samples, 2.00%)</title><rect x="725.8" y="149" width="23.5" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="728.75" y="159.5" >[..</text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (9,753,331 samples, 0.42%)</title><rect x="255.4" y="53" width="5.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="258.41" y="63.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (9,446,267 samples, 0.41%)</title><rect x="159.0" y="165" width="4.9" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="162.03" y="175.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (23,176,075 samples, 1.01%)</title><rect x="682.9" y="165" width="11.9" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="685.94" y="175.5" ></text>
+</g>
+<g >
+<title>pthread_mutex_lock (6,572,571 samples, 0.29%)</title><rect x="815.8" y="117" width="3.4" height="15.0" fill="rgb(247,196,46)" rx="2" ry="2" />
+<text  x="818.82" y="127.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (129,228,725 samples, 5.61%)</title><rect x="210.3" y="165" width="66.2" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="213.34" y="175.5" >[libvul..</text>
+</g>
+<g >
+<title>_dl_catch_exception (13,749,101 samples, 0.60%)</title><rect x="82.3" y="197" width="7.1" height="15.0" fill="rgb(253,223,53)" rx="2" ry="2" />
+<text  x="85.32" y="207.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (13,749,101 samples, 0.60%)</title><rect x="82.3" y="277" width="7.1" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="85.32" y="287.5" ></text>
+</g>
+<g >
+<title>pthread_mutex_lock (17,494,568 samples, 0.76%)</title><rect x="951.0" y="181" width="9.0" height="15.0" fill="rgb(247,196,46)" rx="2" ry="2" />
+<text  x="953.99" y="191.5" ></text>
+</g>
+<g >
+<title>runtime::_append_elem (7,061,318 samples, 0.31%)</title><rect x="628.6" y="197" width="3.6" height="15.0" fill="rgb(210,25,5)" rx="2" ry="2" />
+<text  x="631.60" y="207.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (23,176,075 samples, 1.01%)</title><rect x="682.9" y="181" width="11.9" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="685.94" y="191.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (96,896,382 samples, 4.20%)</title><rect x="215.6" y="149" width="49.6" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="218.55" y="159.5" >[libv..</text>
+</g>
+<g >
+<title>[libc.so.6] (19,549,046 samples, 0.85%)</title><rect x="72.3" y="309" width="10.0" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="75.31" y="319.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (101,218,065 samples, 4.39%)</title><rect x="1066.4" y="293" width="51.9" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="1069.44" y="303.5" >[libS..</text>
+</g>
+<g >
+<title>[unknown] (11,820,981 samples, 0.51%)</title><rect x="270.4" y="85" width="6.1" height="15.0" fill="rgb(210,24,5)" rx="2" ry="2" />
+<text  x="273.45" y="95.5" ></text>
+</g>
+<g >
+<title>[libGLX_nvidia.so.610.43.03] (9,945,843 samples, 0.43%)</title><rect x="84.3" y="117" width="5.1" height="15.0" fill="rgb(253,221,53)" rx="2" ry="2" />
+<text  x="87.27" y="127.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (10,923,553 samples, 0.47%)</title><rect x="875.4" y="149" width="5.6" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="878.37" y="159.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (17,437,186 samples, 0.76%)</title><rect x="891.0" y="229" width="8.9" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="893.97" y="239.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (529,290 samples, 0.02%)</title><rect x="880.7" y="117" width="0.3" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="883.69" y="127.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (121,561,671 samples, 5.27%)</title><rect x="10.1" y="325" width="62.2" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="13.07" y="335.5" >[libSD..</text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (37,715,331 samples, 1.64%)</title><rect x="1099.0" y="133" width="19.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1101.96" y="143.5" ></text>
+</g>
+<g >
+<title>wl_display_dispatch_queue_pending (9,419,443 samples, 0.41%)</title><rect x="67.5" y="245" width="4.8" height="15.0" fill="rgb(234,136,32)" rx="2" ry="2" />
+<text  x="70.49" y="255.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (63,861,067 samples, 2.77%)</title><rect x="716.6" y="165" width="32.7" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="719.63" y="175.5" >[l..</text>
+</g>
+<g >
+<title>[libxkbcommon.so.0.13.2] (9,419,443 samples, 0.41%)</title><rect x="67.5" y="69" width="4.8" height="15.0" fill="rgb(246,190,45)" rx="2" ry="2" />
+<text  x="70.49" y="79.5" ></text>
+</g>
+<g >
+<title>__$map_get$$map[string]engine::Clip_Def (46,343,544 samples, 2.01%)</title><rect x="455.5" y="213" width="23.7" height="15.0" fill="rgb(211,32,7)" rx="2" ry="2" />
+<text  x="458.48" y="223.5" >_..</text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (73,978,640 samples, 3.21%)</title><rect x="149.3" y="197" width="37.9" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="152.29" y="207.5" >[li..</text>
+</g>
+<g >
+<title>main::main (1,863,066,199 samples, 80.84%)</title><rect x="112.5" y="261" width="953.9" height="15.0" fill="rgb(224,91,21)" rx="2" ry="2" />
+<text  x="115.52" y="271.5" >main::main</text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (505,369,078 samples, 21.93%)</title><rect x="632.2" y="229" width="258.8" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="635.21" y="239.5" >[libSDL3.so.0.4.12]</text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (17,437,186 samples, 0.76%)</title><rect x="891.0" y="213" width="8.9" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="893.97" y="223.5" ></text>
+</g>
+<g >
+<title>all (2,304,609,671 samples, 100%)</title><rect x="10.0" y="357" width="1180.0" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
+<text  x="13.00" y="367.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (73,168,487 samples, 3.17%)</title><rect x="1080.8" y="181" width="37.5" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1083.81" y="191.5" >[li..</text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (73,168,487 samples, 3.17%)</title><rect x="1080.8" y="213" width="37.5" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1083.81" y="223.5" >[li..</text>
+</g>
+<g >
+<title>[libffi.so.8.4.1] (9,419,443 samples, 0.41%)</title><rect x="67.5" y="165" width="4.8" height="15.0" fill="rgb(207,9,2)" rx="2" ry="2" />
+<text  x="70.49" y="175.5" ></text>
+</g>
+<g >
+<title>[libGLX_nvidia.so.610.43.03] (11,186,482 samples, 0.49%)</title><rect x="89.4" y="229" width="5.7" height="15.0" fill="rgb(253,221,53)" rx="2" ry="2" />
+<text  x="92.36" y="239.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (9,454,315 samples, 0.41%)</title><rect x="163.9" y="165" width="4.8" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="166.87" y="175.5" ></text>
+</g>
+<g >
+<title>_dl_catch_exception (13,749,101 samples, 0.60%)</title><rect x="82.3" y="245" width="7.1" height="15.0" fill="rgb(253,223,53)" rx="2" ry="2" />
+<text  x="85.32" y="255.5" ></text>
+</g>
+<g >
+<title>[libGLX_nvidia.so.610.43.03] (9,945,843 samples, 0.43%)</title><rect x="84.3" y="101" width="5.1" height="15.0" fill="rgb(253,221,53)" rx="2" ry="2" />
+<text  x="87.27" y="111.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (19,472,565 samples, 0.84%)</title><rect x="97.8" y="165" width="10.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="100.85" y="175.5" ></text>
+</g>
+<g >
+<title>[libGLX_nvidia.so.610.43.03] (11,186,482 samples, 0.49%)</title><rect x="89.4" y="277" width="5.7" height="15.0" fill="rgb(253,221,53)" rx="2" ry="2" />
+<text  x="92.36" y="287.5" ></text>
+</g>
+<g >
+<title>dbus_connection_dispatch (12,070,161 samples, 0.52%)</title><rect x="960.0" y="197" width="6.1" height="15.0" fill="rgb(205,1,0)" rx="2" ry="2" />
+<text  x="962.95" y="207.5" ></text>
+</g>
+<g >
+<title>clock_gettime (19,163,986 samples, 0.83%)</title><rect x="796.2" y="149" width="9.8" height="15.0" fill="rgb(213,39,9)" rx="2" ry="2" />
+<text  x="799.20" y="159.5" ></text>
+</g>
+<g >
+<title>[libxkbcommon.so.0.13.2] (9,419,443 samples, 0.41%)</title><rect x="67.5" y="117" width="4.8" height="15.0" fill="rgb(246,190,45)" rx="2" ry="2" />
+<text  x="70.49" y="127.5" ></text>
+</g>
+<g >
+<title>pthread_mutex_lock (18,247,640 samples, 0.79%)</title><rect x="819.2" y="117" width="9.3" height="15.0" fill="rgb(247,196,46)" rx="2" ry="2" />
+<text  x="822.19" y="127.5" ></text>
+</g>
+<g >
+<title>runtime::bounds_check_error (12,346,568 samples, 0.54%)</title><rect x="911.0" y="213" width="6.3" height="15.0" fill="rgb(221,73,17)" rx="2" ry="2" />
+<text  x="913.95" y="223.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (57,423,030 samples, 2.49%)</title><rect x="235.7" y="133" width="29.5" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="238.75" y="143.5" >[l..</text>
+</g>
+<g >
+<title>runtime::append_elem:proc (12,615,968 samples, 0.55%)</title><rect x="625.8" y="229" width="6.4" height="15.0" fill="rgb(232,128,30)" rx="2" ry="2" />
+<text  x="628.75" y="239.5" ></text>
+</g>
+<g >
+<title>runtime::default_hasher (29,573,324 samples, 1.28%)</title><rect x="1024.1" y="181" width="15.1" height="15.0" fill="rgb(224,90,21)" rx="2" ry="2" />
+<text  x="1027.07" y="191.5" ></text>
+</g>
+<g >
+<title>engine::end_frame (16,323,788 samples, 0.71%)</title><rect x="1118.3" y="293" width="8.3" height="15.0" fill="rgb(243,175,42)" rx="2" ry="2" />
+<text  x="1121.27" y="303.5" ></text>
+</g>
+<g >
+<title>[unknown] (34,950,221 samples, 1.52%)</title><rect x="1172.1" y="325" width="17.9" height="15.0" fill="rgb(210,24,5)" rx="2" ry="2" />
+<text  x="1175.10" y="335.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (16,323,788 samples, 0.71%)</title><rect x="1118.3" y="261" width="8.3" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="1121.27" y="271.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (101,218,065 samples, 4.39%)</title><rect x="1066.4" y="261" width="51.9" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1069.44" y="271.5" >[libv..</text>
+</g>
+<g >
+<title>[libnvidia-glcore.so.610.43.03] (9,945,843 samples, 0.43%)</title><rect x="84.3" y="85" width="5.1" height="15.0" fill="rgb(235,141,33)" rx="2" ry="2" />
+<text  x="87.27" y="95.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (9,751,894 samples, 0.42%)</title><rect x="917.3" y="213" width="5.0" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="920.28" y="223.5" ></text>
+</g>
+<g >
+<title>runtime::bounds_check_error (10,404,487 samples, 0.45%)</title><rect x="479.2" y="213" width="5.3" height="15.0" fill="rgb(221,73,17)" rx="2" ry="2" />
+<text  x="482.21" y="223.5" ></text>
+</g>
+<g >
+<title>wl_display_roundtrip_queue (9,419,443 samples, 0.41%)</title><rect x="67.5" y="293" width="4.8" height="15.0" fill="rgb(209,21,5)" rx="2" ry="2" />
+<text  x="70.49" y="303.5" ></text>
+</g>
+<g >
+<title>runtime::memory_equal (16,523,202 samples, 0.72%)</title><rect x="470.7" y="181" width="8.5" height="15.0" fill="rgb(205,0,0)" rx="2" ry="2" />
+<text  x="473.75" y="191.5" ></text>
+</g>
+<g >
+<title>pthread_mutex_unlock (7,866,232 samples, 0.34%)</title><rect x="842.3" y="165" width="4.1" height="15.0" fill="rgb(231,120,28)" rx="2" ry="2" />
+<text  x="845.32" y="175.5" ></text>
+</g>
+<g >
+<title>__$hasher$$string (15,283,482 samples, 0.66%)</title><rect x="447.7" y="213" width="7.8" height="15.0" fill="rgb(253,223,53)" rx="2" ry="2" />
+<text  x="450.65" y="223.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (63,861,067 samples, 2.77%)</title><rect x="716.6" y="181" width="32.7" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="719.63" y="191.5" >[l..</text>
+</g>
+<g >
+<title>[libxkbcommon.so.0.13.2] (9,419,443 samples, 0.41%)</title><rect x="67.5" y="101" width="4.8" height="15.0" fill="rgb(246,190,45)" rx="2" ry="2" />
+<text  x="70.49" y="111.5" ></text>
+</g>
+<g >
+<title>xkb_compose_table_new_from_locale (9,419,443 samples, 0.41%)</title><rect x="67.5" y="133" width="4.8" height="15.0" fill="rgb(210,26,6)" rx="2" ry="2" />
+<text  x="70.49" y="143.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (56,882,145 samples, 2.47%)</title><rect x="665.7" y="197" width="29.1" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="668.68" y="207.5" >[l..</text>
+</g>
+<g >
+<title>[libxkbcommon.so.0.13.2] (9,419,443 samples, 0.41%)</title><rect x="67.5" y="53" width="4.8" height="15.0" fill="rgb(246,190,45)" rx="2" ry="2" />
+<text  x="70.49" y="63.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (19,472,565 samples, 0.84%)</title><rect x="97.8" y="213" width="10.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="100.85" y="223.5" ></text>
+</g>
+<g >
+<title>[ld-linux-x86-64.so.2] (13,749,101 samples, 0.60%)</title><rect x="82.3" y="181" width="7.1" height="15.0" fill="rgb(243,178,42)" rx="2" ry="2" />
+<text  x="85.32" y="191.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (19,495,091 samples, 0.85%)</title><rect x="97.8" y="293" width="10.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="100.83" y="303.5" ></text>
+</g>
+<g >
+<title>dbus_connection_get_dispatch_status (18,725,003 samples, 0.81%)</title><rect x="941.4" y="181" width="9.6" height="15.0" fill="rgb(244,179,42)" rx="2" ry="2" />
+<text  x="944.41" y="191.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (19,472,565 samples, 0.84%)</title><rect x="97.8" y="181" width="10.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="100.85" y="191.5" ></text>
+</g>
+<g >
+<title>engine::update_sprite (195,816,016 samples, 8.50%)</title><rect x="966.2" y="245" width="100.2" height="15.0" fill="rgb(244,180,43)" rx="2" ry="2" />
+<text  x="969.18" y="255.5" >engine::upda..</text>
+</g>
+<g >
+<title>pthread_mutex_lock (10,863,380 samples, 0.47%)</title><rect x="935.8" y="165" width="5.6" height="15.0" fill="rgb(247,196,46)" rx="2" ry="2" />
+<text  x="938.84" y="175.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (188,572,438 samples, 8.18%)</title><rect x="652.8" y="213" width="96.5" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="655.78" y="223.5" >[libSDL3.so..</text>
+</g>
+<g >
+<title>[libzstd.so.1.5.7] (19,472,565 samples, 0.84%)</title><rect x="97.8" y="53" width="10.0" height="15.0" fill="rgb(226,100,23)" rx="2" ry="2" />
+<text  x="100.85" y="63.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (39,593,833 samples, 1.72%)</title><rect x="240.1" y="69" width="20.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="243.13" y="79.5" ></text>
+</g>
+<g >
+<title>runtime::memory_equal (10,488,332 samples, 0.46%)</title><rect x="1056.1" y="181" width="5.3" height="15.0" fill="rgb(205,0,0)" rx="2" ry="2" />
+<text  x="1059.05" y="191.5" ></text>
+</g>
+<g >
+<title>main::main (101,218,065 samples, 4.39%)</title><rect x="1066.4" y="325" width="51.9" height="15.0" fill="rgb(224,91,21)" rx="2" ry="2" />
+<text  x="1069.44" y="335.5" >main:..</text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (19,472,565 samples, 0.84%)</title><rect x="97.8" y="229" width="10.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="100.85" y="239.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (106,498,259 samples, 4.62%)</title><rect x="694.8" y="197" width="54.5" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="697.80" y="207.5" >[libv..</text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (85,667,248 samples, 3.72%)</title><rect x="922.3" y="213" width="43.8" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="925.27" y="223.5" >[lib..</text>
+</g>
+<g >
+<title>wl_display_dispatch_queue_timeout (9,419,443 samples, 0.41%)</title><rect x="67.5" y="261" width="4.8" height="15.0" fill="rgb(214,45,10)" rx="2" ry="2" />
+<text  x="70.49" y="271.5" ></text>
+</g>
+<g >
+<title>[libSDL3.so.0.4.12] (9,419,443 samples, 0.41%)</title><rect x="67.5" y="149" width="4.8" height="15.0" fill="rgb(235,142,34)" rx="2" ry="2" />
+<text  x="70.49" y="159.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (19,472,565 samples, 0.84%)</title><rect x="97.8" y="245" width="10.0" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="100.85" y="255.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (13,749,101 samples, 0.60%)</title><rect x="82.3" y="229" width="7.1" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="85.32" y="239.5" ></text>
+</g>
+<g >
+<title>wl_display_dispatch_queue (9,419,443 samples, 0.41%)</title><rect x="67.5" y="277" width="4.8" height="15.0" fill="rgb(235,138,33)" rx="2" ry="2" />
+<text  x="70.49" y="287.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (11,186,482 samples, 0.49%)</title><rect x="89.4" y="213" width="5.7" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="92.36" y="223.5" ></text>
+</g>
+<g >
+<title>pthread_rwlock_wrlock (8,806,208 samples, 0.38%)</title><rect x="833.1" y="165" width="4.5" height="15.0" fill="rgb(228,109,26)" rx="2" ry="2" />
+<text  x="836.09" y="175.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (16,323,788 samples, 0.71%)</title><rect x="1118.3" y="213" width="8.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1121.27" y="223.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (54,837,227 samples, 2.38%)</title><rect x="1090.2" y="149" width="28.1" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1093.19" y="159.5" >[..</text>
+</g>
+<g >
+<title>[libc.so.6] (22,142,026 samples, 0.96%)</title><rect x="265.2" y="133" width="11.3" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="268.16" y="143.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (6,742,674 samples, 0.29%)</title><rect x="679.5" y="133" width="3.4" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="682.48" y="143.5" ></text>
+</g>
+<g >
+<title>dlopen (13,749,101 samples, 0.60%)</title><rect x="82.3" y="293" width="7.1" height="15.0" fill="rgb(216,51,12)" rx="2" ry="2" />
+<text  x="85.32" y="303.5" ></text>
+</g>
+<g >
+<title>ZSTD_decompress_usingDDict (19,472,565 samples, 0.84%)</title><rect x="97.8" y="133" width="10.0" height="15.0" fill="rgb(230,118,28)" rx="2" ry="2" />
+<text  x="100.85" y="143.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (19,549,046 samples, 0.85%)</title><rect x="72.3" y="325" width="10.0" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="75.31" y="335.5" ></text>
+</g>
+<g >
+<title>pthread_rwlock_rdlock (8,116,234 samples, 0.35%)</title><rect x="168.7" y="165" width="4.2" height="15.0" fill="rgb(251,214,51)" rx="2" ry="2" />
+<text  x="171.71" y="175.5" ></text>
+</g>
+<g >
+<title>mem::copy (9,751,894 samples, 0.42%)</title><rect x="917.3" y="229" width="5.0" height="15.0" fill="rgb(241,169,40)" rx="2" ry="2" />
+<text  x="920.28" y="239.5" ></text>
+</g>
+<g >
+<title>[libc.so.6] (9,140,151 samples, 0.40%)</title><rect x="749.3" y="213" width="4.7" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="752.33" y="223.5" ></text>
+</g>
+<g >
+<title>main::main (16,323,788 samples, 0.71%)</title><rect x="1118.3" y="309" width="8.3" height="15.0" fill="rgb(224,91,21)" rx="2" ry="2" />
+<text  x="1121.27" y="319.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (73,168,487 samples, 3.17%)</title><rect x="1080.8" y="197" width="37.5" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1083.81" y="207.5" >[li..</text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (73,168,487 samples, 3.17%)</title><rect x="1080.8" y="165" width="37.5" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1083.81" y="175.5" >[li..</text>
+</g>
+<g >
+<title>[unknown] (11,820,981 samples, 0.51%)</title><rect x="270.4" y="69" width="6.1" height="15.0" fill="rgb(210,24,5)" rx="2" ry="2" />
+<text  x="273.45" y="79.5" ></text>
+</g>
+<g >
+<title>main (1,863,105,327 samples, 80.84%)</title><rect x="112.5" y="277" width="953.9" height="15.0" fill="rgb(243,179,42)" rx="2" ry="2" />
+<text  x="115.50" y="287.5" >main</text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (15,948,532 samples, 0.69%)</title><rect x="674.8" y="149" width="8.1" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="677.77" y="159.5" ></text>
+</g>
+<g >
+<title>ffi_call (9,419,443 samples, 0.41%)</title><rect x="67.5" y="197" width="4.8" height="15.0" fill="rgb(242,171,41)" rx="2" ry="2" />
+<text  x="70.49" y="207.5" ></text>
+</g>
+<g >
+<title>engine::begin_frame (248,472,422 samples, 10.78%)</title><rect x="149.3" y="245" width="127.2" height="15.0" fill="rgb(212,34,8)" rx="2" ry="2" />
+<text  x="152.29" y="255.5" >engine::begin_f..</text>
+</g>
+<g >
+<title>[libc.so.6] (15,793,346 samples, 0.69%)</title><rect x="740.2" y="117" width="8.1" height="15.0" fill="rgb(223,84,20)" rx="2" ry="2" />
+<text  x="743.22" y="127.5" ></text>
+</g>
+<g >
+<title>main (16,323,788 samples, 0.71%)</title><rect x="1118.3" y="325" width="8.3" height="15.0" fill="rgb(243,179,42)" rx="2" ry="2" />
+<text  x="1121.27" y="335.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (16,323,788 samples, 0.71%)</title><rect x="1118.3" y="149" width="8.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="1121.27" y="159.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (174,493,782 samples, 7.57%)</title><rect x="187.2" y="197" width="89.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="190.17" y="207.5" >[libvulkan..</text>
+</g>
+<g >
+<title>[libGLX_nvidia.so.610.43.03] (11,186,482 samples, 0.49%)</title><rect x="89.4" y="245" width="5.7" height="15.0" fill="rgb(253,221,53)" rx="2" ry="2" />
+<text  x="92.36" y="255.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (39,593,833 samples, 1.72%)</title><rect x="240.1" y="117" width="20.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="243.13" y="127.5" ></text>
+</g>
+<g >
+<title>[unknown] (9,114,576 samples, 0.40%)</title><rect x="107.8" y="325" width="4.7" height="15.0" fill="rgb(210,24,5)" rx="2" ry="2" />
+<text  x="110.84" y="335.5" ></text>
+</g>
+<g >
+<title>[libvulkan_radeon.so] (39,593,833 samples, 1.72%)</title><rect x="240.1" y="85" width="20.3" height="15.0" fill="rgb(211,31,7)" rx="2" ry="2" />
+<text  x="243.13" y="95.5" ></text>
+</g>
+<g >
+<title>engine::draw_sprite (694,703,810 samples, 30.14%)</title><rect x="276.5" y="245" width="355.7" height="15.0" fill="rgb(220,69,16)" rx="2" ry="2" />
+<text  x="279.51" y="255.5" >engine::draw_sprite</text>
+</g>
+</g>
+</svg>
