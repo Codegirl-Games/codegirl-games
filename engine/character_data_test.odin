@@ -64,6 +64,55 @@ character_frame_rect_hit_and_miss :: proc(t: ^testing.T) {
 	testing.expect(t, !ok)
 }
 
+@(test)
+character_frame_returns_full_def :: proc(t: ^testing.T) {
+	data: Character_Data
+	data.def.clips = make(map[string]Clip_Def)
+	defer delete(data.def.clips)
+
+	frames := make([]Frame_Def, 1)
+	frames[0] = Frame_Def {
+		rect        = {10, 20, 30, 40},
+		source_size = {100, 200},
+		trim_offset = {5, 7},
+	}
+	defer delete(frames)
+
+	data.def.clips["idle"] = Clip_Def {
+		loop   = true,
+		fps    = 10,
+		frames = frames,
+	}
+
+	frame, ok := character_frame(&data, "idle", 0)
+	testing.expect(t, ok)
+	testing.expect_value(t, frame.rect, [4]int{10, 20, 30, 40})
+	testing.expect_value(t, frame.source_size, [2]int{100, 200})
+	testing.expect_value(t, frame.trim_offset, [2]int{5, 7})
+}
+
+@(test)
+character_frame_nil_and_bad_index :: proc(t: ^testing.T) {
+	_, ok := character_frame(nil, "idle", 0)
+	testing.expect(t, !ok)
+
+	data: Character_Data
+	data.def.clips = make(map[string]Clip_Def)
+	defer delete(data.def.clips)
+
+	frames := make([]Frame_Def, 1)
+	frames[0] = {rect = {1, 2, 3, 4}}
+	defer delete(frames)
+	data.def.clips["idle"] = Clip_Def{frames = frames}
+
+	_, ok = character_frame(&data, "idle", -1)
+	testing.expect(t, !ok)
+	_, ok = character_frame(&data, "idle", 1)
+	testing.expect(t, !ok)
+	_, ok = character_frame(&data, "missing", 0)
+	testing.expect(t, !ok)
+}
+
 destroy_char_def :: proc(def: ^Char_Def) {
 	if def == nil do return
 
