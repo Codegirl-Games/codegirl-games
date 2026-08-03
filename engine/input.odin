@@ -7,6 +7,11 @@ Key :: enum {
 	D,
 	Left,
 	Right,
+	Up,
+	Down,
+	Space,
+	N1,
+	N2,
 }
 
 key_down :: proc(key: Key) -> bool {
@@ -23,6 +28,16 @@ key_down :: proc(key: Key) -> bool {
 		scan_code = .LEFT
 	case .Right:
 		scan_code = .RIGHT
+	case .Up:
+		scan_code = .UP
+	case .Down:
+		scan_code = .DOWN
+	case .Space:
+		scan_code = .SPACE
+	case .N1:
+		scan_code = ._1
+	case .N2:
+		scan_code = ._2
 	}
 	return keys[scan_code]
 }
