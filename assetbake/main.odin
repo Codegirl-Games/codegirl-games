@@ -287,16 +287,14 @@ destroy_frames :: proc(frames: []^image.Image) {
 	delete(frames)
 }
 
-opaque_bounds :: proc(img: ^image.Image, alpha_min: u8 = 1) -> (x, y, w, h: int) {
-	iw, ih := int(img.width), int(img.height)
-	pixels := bytes.buffer_to_bytes(&img.pixels)
-
+opaque_bounds_rgba :: proc(pixels: []u8, iw, ih: int, alpha_min: u8 = 1) -> (x, y, w, h: int) {
 	min_x, min_y := iw, ih
 	max_x, max_y := -1, -1
 
 	for py in 0 ..< ih {
 		for px in 0 ..< iw {
 			i := (py * iw + px) * 4
+			if i + 3 >= len(pixels) do continue
 			a := pixels[i + 3]
 			if a >= alpha_min {
 				if px < min_x do min_x = px
@@ -311,6 +309,12 @@ opaque_bounds :: proc(img: ^image.Image, alpha_min: u8 = 1) -> (x, y, w, h: int)
 		return 0, 0, 1, 1
 	}
 	return min_x, min_y, max_x - min_x + 1, max_y - min_y + 1
+}
+
+opaque_bounds :: proc(img: ^image.Image, alpha_min: u8 = 1) -> (x, y, w, h: int) {
+	iw, ih := int(img.width), int(img.height)
+	pixels := bytes.buffer_to_bytes(&img.pixels)
+	return opaque_bounds_rgba(pixels, iw, ih, alpha_min)
 }
 
 pack_atlas :: proc(frames: []^image.Image) -> Atlas {

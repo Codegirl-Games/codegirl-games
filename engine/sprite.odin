@@ -112,19 +112,15 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 	viewport := Vec2{f32(app.swapchain_w), f32(app.swapchain_h)}
 	feet := world_to_screen(app.camera, sprite.position, viewport)
 
-	canvas_top := feet.y - src_h * pivot[1]
-	x0_px, y0_px: f32
-	if sprite.flip_x {
-		canvas_left := feet.x - (1.0 - pivot[0]) * src_w
-		x0_px = canvas_left + (src_w - trim_x - fw)
-		y0_px = canvas_top + trim_y
-	} else {
-		canvas_left := feet.x - src_w * pivot[0]
-		x0_px = canvas_left + trim_x
-		y0_px = canvas_top + trim_y
-	}
-	x1_px := x0_px + fw
-	y1_px := y0_px + fh
+	x0_px, y0_px, x1_px, y1_px := sprite_feet_quad(
+		feet,
+		src_w,
+		src_h,
+		{trim_x, trim_y},
+		{fw, fh},
+		pivot,
+		sprite.flip_x,
+	)
 
 	sw := f32(app.swapchain_w)
 	sh := f32(app.swapchain_h)
@@ -135,11 +131,7 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 
 	tex_w := f32(sprite.data.width)
 	tex_h := f32(sprite.data.height)
-	u0 := f32(frame.rect[0]) / tex_w
-	v0 := f32(frame.rect[1]) / tex_h
-	u1 := f32(frame.rect[0] + frame.rect[2]) / tex_w
-	v1 := f32(frame.rect[1] + frame.rect[3]) / tex_h
-	if sprite.flip_x do u0, u1 = u1, u0
+	u0, v0, u1, v1 := frame_uvs(frame.rect, tex_w, tex_h, sprite.flip_x)
 
 	verts := [SPRITE_VERT_COUNT]Vertex {
 		{pos = p0, uv = {u0, v0}},
@@ -168,6 +160,40 @@ set_sprite_clip :: proc(sprite: ^Sprite, clip: string) {
 
 sprite_quad_origin :: proc(position: Vec2, size: Vec2, pivot: [2]f32) -> Vec2 {
 	return {position.x - size.x * pivot[0], position.y - size.y * pivot[1]}
+}
+
+frame_uvs :: proc(rect: [4]int, tex_w, tex_h: f32, flip_x: bool) -> (u0, v0, u1, v1: f32) {
+	u0 = f32(rect[0]) / tex_w
+	v0 = f32(rect[1]) / tex_h
+	u1 = f32(rect[0] + rect[2]) / tex_w
+	v1 = f32(rect[1] + rect[3]) / tex_h
+	if flip_x do u0, u1 = u1, u0
+	return
+}
+
+sprite_feet_quad :: proc(
+	feet: Vec2,
+	src_w, src_h: f32,
+	trim: Vec2,
+	size: Vec2,
+	pivot: [2]f32,
+	flip_x: bool,
+) -> (
+	x0, y0, x1, y1: f32,
+) {
+	canvas_top := feet.y - src_h * pivot[1]
+	if flip_x {
+		canvas_left := feet.x - (1.0 - pivot[0]) * src_w
+		x0 = canvas_left + (src_w - trim.x - size.x)
+		y0 = canvas_top + trim.y
+	} else {
+		canvas_left := feet.x - src_w * pivot[0]
+		x0 = canvas_left + trim.x
+		y0 = canvas_top + trim.y
+	}
+	x1 = x0 + size.x
+	y1 = y0 + size.y
+	return
 }
 
 set_sprite_flip_x :: proc(sprite: ^Sprite, flip: bool) {

@@ -21,7 +21,7 @@ shader_filenames_per_backend :: proc(t: ^testing.T) {
 @(test)
 choose_shader_runtime_prefers_msl :: proc(t: ^testing.T) {
 	rt, ok := choose_shader_runtime_from_formats({.MSL, .SPIRV, .DXIL})
-	testing.expect(t, ok)
+	testing.expect(t, ok, "should pick a runtime when MSL is available")
 	testing.expect_value(t, rt.backend, Shader_Backend.Metal_MSL)
 	testing.expect_value(t, rt.shader_dir, "shaders/metal")
 	testing.expect_value(t, rt.format, sdl.GPUShaderFormat{.MSL})
@@ -30,7 +30,7 @@ choose_shader_runtime_prefers_msl :: proc(t: ^testing.T) {
 @(test)
 choose_shader_runtime_spirv_only :: proc(t: ^testing.T) {
 	rt, ok := choose_shader_runtime_from_formats({.SPIRV})
-	testing.expect(t, ok)
+	testing.expect(t, ok, "should pick SPIR-V when it is the only format")
 	testing.expect_value(t, rt.backend, Shader_Backend.Vulkan_SPIRV)
 	testing.expect_value(t, rt.shader_dir, "shaders/vulkan")
 	testing.expect_value(t, rt.format, sdl.GPUShaderFormat{.SPIRV})
@@ -39,5 +39,5 @@ choose_shader_runtime_spirv_only :: proc(t: ^testing.T) {
 @(test)
 choose_shader_runtime_empty_fails :: proc(t: ^testing.T) {
 	_, ok := choose_shader_runtime_from_formats({})
-	testing.expect(t, !ok)
+	testing.expect(t, !ok, "empty format set should fail")
 }
