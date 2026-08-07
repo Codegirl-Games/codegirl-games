@@ -11,6 +11,19 @@ Sprite :: struct {
 	frame:    int,
 	time:     f32,
 	flip_x:   bool,
+
+	draw_ok:          bool,
+	draw_cache_dirty: bool,
+	draw_src_w:       f32,
+	draw_src_h:       f32,
+	draw_fw:          f32,
+	draw_fh:          f32,
+	draw_trim_x:      f32,
+	draw_trim_y:      f32,
+	draw_u0:          f32,
+	draw_v0:          f32,
+	draw_u1:          f32,
+	draw_v1:          f32,
 }
 
 spawn_sprite :: proc(
@@ -36,6 +49,7 @@ spawn_sprite :: proc(
 			}
 		}
 	}
+	invalidate_sprite_draw_cache(&sprite)
 	return sprite
 }
 
@@ -57,6 +71,8 @@ update_sprite :: proc(sprite: ^Sprite, dt: f32) {
 	sprite.time += dt
 	frame_duration := 1.0 / clip.fps
 
+	frame_changed := false
+
 	for sprite.time >= frame_duration {
 		sprite.time -= frame_duration
 		next := sprite.frame + 1
@@ -64,6 +80,7 @@ update_sprite :: proc(sprite: ^Sprite, dt: f32) {
 		if next >= frame_count {
 			if clip.loop {
 				sprite.frame = 0
+				frame_changed = true
 			} else {
 				sprite.frame = frame_count - 1
 				sprite.time = 0
@@ -71,7 +88,12 @@ update_sprite :: proc(sprite: ^Sprite, dt: f32) {
 			}
 		} else {
 			sprite.frame = next
+			frame_changed = true
 		}
+	}
+
+	if frame_changed {
+		invalidate_sprite_draw_cache(sprite)
 	}
 }
 
@@ -80,6 +102,50 @@ to_clip :: proc(px, py, sw, sh: f32) -> [2]f32 {
 		px / sw * 2 - 1,
 		1 - py / sh * 2, // flip y (window pixels are y-down)
 	}
+}
+
+refresh_sprite_draw_cache :: proc(sprite: ^Sprite) {
+	if sprite == nil || sprite.data == nil {
+		return
+	}
+	if !sprite.draw_cache_dirty {
+		return
+	}
+
+	frame, ok := character_frame(sprite.data, sprite.clip, sprite.frame)
+	if !ok {
+		sprite.draw_ok = false
+		sprite.draw_cache_dirty = false
+		return
+	}
+
+	src_w := f32(frame.source_size[0])
+	src_h := f32(frame.source_size[1])
+	if src_w <= 0 do src_w = f32(frame.rect[2])
+	if src_h <= 0 do src_h = f32(frame.rect[3])
+
+	tex_w := f32(sprite.data.width)
+	tex_h := f32(sprite.data.height)
+	u0, v0, u1, v1 := frame_uvs(frame.rect, tex_w, tex_h, false)
+
+	sprite.draw_src_w = src_w
+	sprite.draw_src_h = src_h
+	sprite.draw_fw = f32(frame.rect[2])
+	sprite.draw_fh = f32(frame.rect[3])
+	sprite.draw_trim_x = f32(frame.trim_offset[0])
+	sprite.draw_trim_y = f32(frame.trim_offset[1])
+	sprite.draw_u0 = u0
+	sprite.draw_v0 = v0
+	sprite.draw_u1 = u1
+	sprite.draw_v1 = v1
+	sprite.draw_ok = true
+	sprite.draw_cache_dirty = false
+}
+
+invalidate_sprite_draw_cache :: proc(sprite: ^Sprite) {
+	if sprite == nil do return
+	sprite.draw_cache_dirty = true
+	refresh_sprite_draw_cache(sprite)
 }
 
 draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
@@ -92,22 +158,23 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 	if len(app.draw_list) >= MAX_SPRITES {
 		return
 	}
-
-	frame, ok := character_frame(sprite.data, sprite.clip, sprite.frame)
-	if !ok {
+	if !sprite.draw_ok {
 		return
 	}
 
-	src_w := f32(frame.source_size[0])
-	src_h := f32(frame.source_size[1])
-	if src_w <= 0 do src_w = f32(frame.rect[2])
-	if src_h <= 0 do src_h = f32(frame.rect[3])
-
-	fw := f32(frame.rect[2])
-	fh := f32(frame.rect[3])
-	trim_x := f32(frame.trim_offset[0])
-	trim_y := f32(frame.trim_offset[1])
+	src_w := sprite.draw_src_w
+	src_h := sprite.draw_src_h
+	fw := sprite.draw_fw
+	fh := sprite.draw_fh
+	trim_x := sprite.draw_trim_x
+	trim_y := sprite.draw_trim_y
 	pivot := sprite.data.def.pivot
+
+	u0, v0 := sprite.draw_u0, sprite.draw_v0
+	u1, v1 := sprite.draw_u1, sprite.draw_v1
+	if sprite.flip_x {
+		u0, u1 = u1, u0
+	}
 
 	viewport := Vec2{f32(app.swapchain_w), f32(app.swapchain_h)}
 	feet := world_to_screen(app.camera, sprite.position, viewport)
@@ -124,14 +191,15 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 
 	sw := f32(app.swapchain_w)
 	sh := f32(app.swapchain_h)
+
+	if x1_px < 0 || y1_px < 0 || x0_px > sw || y0_px > sh {
+		return
+	}
+
 	p0 := to_clip(x0_px, y0_px, sw, sh)
 	p1 := to_clip(x1_px, y0_px, sw, sh)
 	p2 := to_clip(x1_px, y1_px, sw, sh)
 	p3 := to_clip(x0_px, y1_px, sw, sh)
-
-	tex_w := f32(sprite.data.width)
-	tex_h := f32(sprite.data.height)
-	u0, v0, u1, v1 := frame_uvs(frame.rect, tex_w, tex_h, sprite.flip_x)
 
 	verts := [SPRITE_VERT_COUNT]Vertex {
 		{pos = p0, uv = {u0, v0}},
@@ -156,6 +224,7 @@ set_sprite_clip :: proc(sprite: ^Sprite, clip: string) {
 	sprite.clip = clip
 	sprite.frame = 0
 	sprite.time = 0
+	invalidate_sprite_draw_cache(sprite)
 }
 
 sprite_quad_origin :: proc(position: Vec2, size: Vec2, pivot: [2]f32) -> Vec2 {
