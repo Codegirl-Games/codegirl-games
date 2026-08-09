@@ -39,6 +39,22 @@ The paired benchmark used ten order-alternated samples of 400 frames:
 Instancing improved median frame time by approximately **1.1%** on
 Vulkan/Lavapipe with 128 sprites.
 
+## Reproduction harness
+
+Run the committed visible full-frame workload on baseline and candidate commits:
+
+```bash
+make perf-frame \
+	PERF_FRAME_SCENARIO=0 \
+	PERF_FRAME_SPRITES=128 \
+	PERF_ODIN_FLAGS="-debug -o:speed"
+```
+
+Keep all other `PERF_FRAME_*` values unchanged and compare
+`median_ms_per_frame`. To test 512 or more sprites, first raise the engine's
+`MAX_SPRITES` and associated buffer capacities on the candidate branch, then
+set `PERF_FRAME_SPRITES` to the same value.
+
 ## Suggested fix
 
 Treat this as a prototype gated by larger sprite counts or a demonstrated

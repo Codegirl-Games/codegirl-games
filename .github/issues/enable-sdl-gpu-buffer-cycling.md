@@ -32,6 +32,20 @@ A temporary paired benchmark used:
 Cycling improved median frame time by approximately **0.7%**. This is a small
 performance change, but it also follows SDL's documented resource-reuse model.
 
+## Reproduction harness
+
+Run the committed full-frame harness on the baseline commit and candidate
+commit:
+
+```bash
+make perf-frame \
+	PERF_FRAME_SCENARIO=0 \
+	PERF_ODIN_FLAGS="-debug -o:speed"
+```
+
+Keep all `PERF_FRAME_*` values unchanged. Compare `median_ms_per_frame`; the
+harness waits for GPU idle before stopping each trial timer.
+
 ## Suggested fix
 
 Cycle both resources that are fully overwritten each frame:

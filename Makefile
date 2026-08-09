@@ -16,6 +16,7 @@ FLAME_PREFIX := $(FLAME_OUT_DIR)/$(FLAME_EXAMPLE)-$(FLAME_STAMP)
 PERF_DRAW_ITERATIONS ?= 2000000
 PERF_DRAW_WARMUP ?= 10000
 PERF_DRAW_TRIALS ?= 7
+PERF_ODIN_FLAGS ?= -debug -o:speed
 PERF_FRAME_SPRITES ?= 128
 PERF_FRAME_FRAMES ?= 400
 PERF_FRAME_WARMUP ?= 100
@@ -71,13 +72,19 @@ check:
 	odin check examples/clips -collection:pkg=.
 
 perf-draw:
-	odin run benchmarks/draw_sprite -collection:pkg=. -debug -o:speed \
+	@echo "git_commit=$$(git rev-parse HEAD)"
+	@echo "odin_version=$$(odin version)"
+	@echo "odin_flags=$(PERF_ODIN_FLAGS)"
+	odin run benchmarks/draw_sprite -collection:pkg=. $(PERF_ODIN_FLAGS) \
 		-define:PERF_ITERATIONS=$(PERF_DRAW_ITERATIONS) \
 		-define:PERF_WARMUP=$(PERF_DRAW_WARMUP) \
 		-define:PERF_TRIALS=$(PERF_DRAW_TRIALS)
 
 perf-frame:
-	odin run benchmarks/sprite_frame -collection:pkg=. -debug -o:speed \
+	@echo "git_commit=$$(git rev-parse HEAD)"
+	@echo "odin_version=$$(odin version)"
+	@echo "odin_flags=$(PERF_ODIN_FLAGS)"
+	odin run benchmarks/sprite_frame -collection:pkg=. $(PERF_ODIN_FLAGS) \
 		-define:PERF_SPRITES=$(PERF_FRAME_SPRITES) \
 		-define:PERF_FRAMES=$(PERF_FRAME_FRAMES) \
 		-define:PERF_WARMUP_FRAMES=$(PERF_FRAME_WARMUP) \

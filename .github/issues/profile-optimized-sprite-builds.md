@@ -74,6 +74,16 @@ make flame FLAME_EXAMPLE=crowd
 make flame FLAME_EXAMPLE=crowd FLAME_ODIN_FLAGS="-debug -o:none"
 ```
 
+Reproduce the isolated build-mode comparison with the committed CPU harness:
+
+```bash
+make perf-draw PERF_ODIN_FLAGS="-debug -o:none"
+make perf-draw PERF_ODIN_FLAGS="-debug -o:speed"
+```
+
+Both runs print the Git commit, Odin version, compiler flags, every trial, and
+the median nanoseconds per draw.
+
 Consider applying an explicit optimization mode to performance-oriented example
 runs as well. Plain `odin run` currently uses Odin's unoptimized default.
 

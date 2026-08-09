@@ -55,6 +55,18 @@ Environment:
 - Optimized with `-debug -o:speed`
 - Linux x86-64
 
+## Reproduction harness
+
+Run the committed CPU harness on the baseline commit and again after applying
+the suggested fix:
+
+```bash
+make perf-draw PERF_ODIN_FLAGS="-debug -o:speed"
+```
+
+Keep `PERF_DRAW_ITERATIONS`, `PERF_DRAW_WARMUP`, and `PERF_DRAW_TRIALS`
+unchanged between commits. Compare `median_ns_per_draw`.
+
 ## Suggested fix
 
 Compute clip scaling once and construct corners from the unique coordinates:

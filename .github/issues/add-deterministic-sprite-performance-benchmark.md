@@ -97,24 +97,45 @@ and report backend details.
 
 Add a non-interactive benchmark target with two explicitly separate workloads.
 
-Add dedicated Makefile targets that always build optimized benchmark code:
+The committed harnesses are:
 
 ```make
-PERF_ITERATIONS ?= 2000000
-PERF_FRAMES ?= 1000
+PERF_ODIN_FLAGS ?= -debug -o:speed
 
 perf-draw:
-	odin run examples/draw_bench \
+	odin run benchmarks/draw_sprite \
 		-collection:pkg=. \
-		-debug -o:speed \
-		-define:PERF_ITERATIONS=$(PERF_ITERATIONS)
+		$(PERF_ODIN_FLAGS) \
+		-define:PERF_ITERATIONS=$(PERF_DRAW_ITERATIONS)
 
 perf-frame:
-	odin run examples/frame_bench \
+	odin run benchmarks/sprite_frame \
 		-collection:pkg=. \
-		-debug -o:speed \
-		-define:PERF_FRAMES=$(PERF_FRAMES)
+		$(PERF_ODIN_FLAGS) \
+		-define:PERF_FRAMES=$(PERF_FRAME_FRAMES) \
+		-define:PERF_SCENARIO=$(PERF_FRAME_SCENARIO)
 ```
+
+Run the standard workloads with:
+
+```bash
+# CPU-only draw preparation.
+make perf-draw
+
+# Complete frame: 128 visible sprites sharing one texture.
+make perf-frame PERF_FRAME_SCENARIO=0
+
+# Complete frame: every second sprite is fully offscreen.
+make perf-frame PERF_FRAME_SCENARIO=1
+
+# Complete frame: 128 sprites alternate between two texture objects.
+make perf-frame PERF_FRAME_SCENARIO=2
+```
+
+Every invocation prints the Git commit, Odin version, compiler flags, workload
+configuration, every trial, and the median. `perf-frame` waits for GPU idle
+after warm-up and after each measured frame batch so outstanding work is
+included.
 
 ### CPU queue benchmark
 

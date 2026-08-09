@@ -28,6 +28,21 @@ A temporary paired benchmark used:
 Sorting and grouping improved median frame time by approximately **1.9%**.
 Hardware drivers with higher draw-call overhead may show a different result.
 
+## Reproduction harness
+
+Run the committed alternating-texture workload on the baseline and candidate
+commits:
+
+```bash
+make perf-frame \
+	PERF_FRAME_SCENARIO=2 \
+	PERF_ODIN_FLAGS="-debug -o:speed"
+```
+
+Keep all `PERF_FRAME_*` values unchanged. The baseline should produce one
+texture run per sprite; the candidate should reduce runs only inside explicit
+reorder-safe groups. Compare `median_ms_per_frame` and verify rendered output.
+
 ## Suggested fix
 
 Add an explicit batch group to queued sprites. Group `0` keeps strict submission
