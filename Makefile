@@ -1,5 +1,6 @@
 .PHONY: shaders-vulkan shaders-d3d12 shaders-metal shaders-all bake toad hello_sprite crowd camera_sandbox clips check test help
 .PHONY: flame flame-build flame-record flame-svg flame-report flame-tools
+.PHONY: perf-draw perf-frame
 
 # Flamegraph profiling (needs: pacman -S perf). Example: make flame  or  make flame FLAME_EXAMPLE=toad
 FLAME_EXAMPLE ?= crowd
@@ -11,6 +12,16 @@ ifndef FLAME_STAMP
 FLAME_STAMP := $(shell date +%Y%m%d-%H%M%S)
 endif
 FLAME_PREFIX := $(FLAME_OUT_DIR)/$(FLAME_EXAMPLE)-$(FLAME_STAMP)
+
+PERF_DRAW_ITERATIONS ?= 2000000
+PERF_DRAW_WARMUP ?= 10000
+PERF_DRAW_TRIALS ?= 7
+PERF_FRAME_SPRITES ?= 128
+PERF_FRAME_FRAMES ?= 400
+PERF_FRAME_WARMUP ?= 100
+PERF_FRAME_TRIALS ?= 10
+# 0=visible, 1=half offscreen, 2=alternating textures
+PERF_FRAME_SCENARIO ?= 0
 
 help:
 	@echo "Targets:"
@@ -31,6 +42,8 @@ help:
 	@echo "  flame-record     perf record (play, then quit)"
 	@echo "  flame-svg        Convert perf.data -> $(FLAME_PREFIX).svg/.jpg"
 	@echo "  flame-report     Convert perf.data -> $(FLAME_PREFIX)-report.txt"
+	@echo "  perf-draw        Deterministic CPU draw benchmark"
+	@echo "  perf-frame       Deterministic SDL GPU frame benchmark (scenario 0/1/2)"
 
 bake:
 	./scripts/bake_all.sh
@@ -56,6 +69,20 @@ check:
 	odin check examples/crowd -collection:pkg=.
 	odin check examples/camera_sandbox -collection:pkg=.
 	odin check examples/clips -collection:pkg=.
+
+perf-draw:
+	odin run benchmarks/draw_sprite -collection:pkg=. -debug -o:speed \
+		-define:PERF_ITERATIONS=$(PERF_DRAW_ITERATIONS) \
+		-define:PERF_WARMUP=$(PERF_DRAW_WARMUP) \
+		-define:PERF_TRIALS=$(PERF_DRAW_TRIALS)
+
+perf-frame:
+	odin run benchmarks/sprite_frame -collection:pkg=. -debug -o:speed \
+		-define:PERF_SPRITES=$(PERF_FRAME_SPRITES) \
+		-define:PERF_FRAMES=$(PERF_FRAME_FRAMES) \
+		-define:PERF_WARMUP_FRAMES=$(PERF_FRAME_WARMUP) \
+		-define:PERF_TRIALS=$(PERF_FRAME_TRIALS) \
+		-define:PERF_SCENARIO=$(PERF_FRAME_SCENARIO)
 
 toad:
 	odin run examples/toad -collection:pkg=.
