@@ -1,2 +1,14 @@
 *.bin
 tutorials/
+
+# Flamegraph / perf profiling artifacts
+tools/FlameGraph/
+perf.data
+perf.data.old
+flame-*.svg
+flame-*.jpg
+flame-*-report.txt
+flame.svg
+flame.jpg
+flame-report.txt
+*_perf

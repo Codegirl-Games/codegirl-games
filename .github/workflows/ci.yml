@@ -48,6 +48,10 @@ jobs:
       - name: Odin version
         run: odin version
 
+      # assetbake tests need vendor:stb native libs
+      - name: Build Odin STB libraries
+        run: make -C "$(odin root)/vendor/stb/src"
+
       - name: Unit tests
         run: make test
 
