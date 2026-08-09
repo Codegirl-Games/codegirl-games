@@ -1,0 +1,783 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1K of event 'cpu/cycles/Pu'
+# Event count (approx.): 8251313686
+#
+# Overhead  Command          Shared Object                   Symbol                                                                                                                                                                
+# ........  ...............  ..............................  ......................................................................................................................................................................
+#
+    10.24%  crowd_perf       crowd_perf                      [.] engine::draw_sprite
+            |
+            ---engine::draw_sprite
+               main::main
+               main
+               0x7fec32c27740
+               __libc_start_main
+               _start
+
+     5.73%  crowd_perf       crowd_perf                      [.] engine::to_clip
+            |
+            ---engine::to_clip
+               engine::draw_sprite
+               main::main
+               main
+               0x7fec32c27740
+               __libc_start_main
+               _start
+
+     2.74%  crowd_perf       crowd_perf                      [.] runtime::default_hasher
+            |
+            ---runtime::default_hasher
+               runtime::default_hasher_string
+               __$hasher$$string
+               |          
+               |--2.10%--engine::character_clip
+               |          engine::update_sprite
+               |          main::main
+               |          main
+               |          0x7fec32c27740
+               |          __libc_start_main
+               |          _start
+               |          
+                --0.64%--engine::character_frame
+                          engine::draw_sprite
+                          main::main
+                          main
+                          0x7fec32c27740
+                          __libc_start_main
+                          _start
+
+     2.48%  crowd_perf       crowd_perf                      [.] engine::sprite_feet_quad
+            |
+            ---engine::sprite_feet_quad
+               engine::draw_sprite
+               main::main
+               main
+               0x7fec32c27740
+               __libc_start_main
+               _start
+
+     2.16%  crowd_perf       libc.so.6                       [.] pthread_mutex_lock
+            |
+            ---pthread_mutex_lock
+               |          
+                --0.60%--wl_proxy_marshal_array_flags
+                          wl_proxy_marshal_flags
+
+     2.09%  crowd_perf       crowd_perf                      [.] __$map_get$$map[string]engine::Clip_Def
+            |
+            ---__$map_get$$map[string]engine::Clip_Def
+               |          
+               |--1.49%--engine::character_clip
+               |          engine::update_sprite
+               |          main::main
+               |          main
+               |          0x7fec32c27740
+               |          __libc_start_main
+               |          _start
+               |          
+                --0.60%--engine::character_frame
+                          engine::draw_sprite
+                          main::main
+                          main
+                          0x7fec32c27740
+                          __libc_start_main
+                          _start
+
+     2.04%  crowd_perf       crowd_perf                      [.] engine::update_sprite
+            |
+            ---engine::update_sprite
+               main::main
+               main
+               0x7fec32c27740
+               __libc_start_main
+               _start
+
+     1.91%  crowd_perf       crowd_perf                      [.] runtime::memory_equal
+            |
+            ---runtime::memory_equal
+               runtime::string_eq
+               __$map_get$$map[string]engine::Clip_Def
+               |          
+               |--1.32%--engine::character_frame
+               |          engine::draw_sprite
+               |          main::main
+               |          main
+               |          0x7fec32c27740
+               |          __libc_start_main
+               |          _start
+               |          
+                --0.58%--engine::character_clip
+                          engine::update_sprite
+                          main::main
+                          main
+                          0x7fec32c27740
+                          __libc_start_main
+                          _start
+
+     1.90%  crowd_perf       crowd_perf                      [.] engine::character_clip
+            |
+            ---engine::character_clip
+               engine::update_sprite
+               main::main
+               main
+               0x7fec32c27740
+               __libc_start_main
+               _start
+
+     1.85%  crowd_perf       crowd_perf                      [.] engine::world_to_screen
+            |
+            ---engine::world_to_screen
+               engine::draw_sprite
+               main::main
+               main
+               0x7fec32c27740
+               __libc_start_main
+               _start
+
+     1.41%  crowd_perf       crowd_perf                      [.] runtime::_append_elem
+            |
+            ---runtime::_append_elem
+               runtime::append_elem:proc(array:^[dynamic]engine::Queued_Sprite,arg:engine::Queued_Sprite,loc:runtime::Source_Code_Location)->(n:int,err:runtime::Allocator_Error)
+               engine::draw_sprite
+               main::main
+               main
+               0x7fec32c27740
+               __libc_start_main
+               _start
+
+     1.37%  crowd_perf       crowd_perf                      [.] engine::end_frame
+            |
+            ---engine::end_frame
+               main::main
+               main
+               0x7fec32c27740
+               __libc_start_main
+               _start
+
+     1.15%  crowd_perf       libc.so.6                       [.] clock_gettime
+            |
+            ---clock_gettime
+
+     1.05%  crowd_perf       libdbus-1.so.3.38.3             [.] _dbus_atomic_dec
+            |
+            ---_dbus_atomic_dec
+               |          
+                --0.95%--_dbus_connection_unref_unlocked
+                          0x7fec32e8fbae
+                          0x7fec32e8fdad
+                          0x7fec32e94b31
+                          0x7fec33054fca
+                          0x7fec33055bbd
+                          engine::events
+                          main::main
+                          main
+                          0x7fec32c27740
+                          __libc_start_main
+                          _start
+
+     0.95%  crowd_perf       crowd_perf                      [.] main::main
+            |
+            ---main::main
+               main
+               0x7fec32c27740
+               __libc_start_main
+               _start
+
+     0.91%  crowd_perf       crowd_perf                      [.] runtime::append_elem:proc(array:^[dynamic]engine::Queued_Sprite,arg:engine::Queued_Sprite,loc:runtime::Source_Code_Location)->(n:int,err:runtime::Allocator_Error)
+            |
+            ---runtime::append_elem:proc(array:^[dynamic]engine::Queued_Sprite,arg:engine::Queued_Sprite,loc:runtime::Source_Code_Location)->(n:int,err:runtime::Allocator_Error)
+               engine::draw_sprite
+               main::main
+               main
+               0x7fec32c27740
+               __libc_start_main
+               _start
+
+     0.91%  crowd_perf       libc.so.6                       [.] 0x000000000018a4c4
+            |
+            ---0x7fec32d8a4c4
+               |          
+                --0.82%--engine::draw_sprite
+                          main::main
+                          main
+                          0x7fec32c27740
+                          __libc_start_main
+                          _start
+
+     0.86%  crowd_perf       crowd_perf                      [.] runtime::string_eq
+            |
+            ---runtime::string_eq
+               __$map_get$$map[string]engine::Clip_Def
+               |          
+                --0.60%--engine::character_clip
+                          engine::update_sprite
+                          main::main
+                          main
+                          0x7fec32c27740
+                          __libc_start_main
+                          _start
+
+     0.84%  crowd_perf       crowd_perf                      [.] engine::character_frame
+            |
+            ---engine::character_frame
+               engine::draw_sprite
+               main::main
+               main
+               0x7fec32c27740
+               __libc_start_main
+               _start
+
+     0.81%  crowd_perf       libwayland-client.so.0.25.0     [.] wl_proxy_marshal_array_flags
+            |
+            ---wl_proxy_marshal_array_flags
+               wl_proxy_marshal_flags
+
+     0.77%  crowd_perf       libc.so.6                       [.] 0x00000000000a7159
+            |
+            ---0x7fec32ca7159
+               |          
+                --0.61%--0x7fec12d80142
+                          0x7fec12d82613
+                          0x7fec12d3cff4
+                          0x7fec12ddcaf6
+                          0x7fec12ddccd4
+                          0x7fec12de6f2c
+                          0x7fec3324fec1
+                          engine::end_frame
+                          main::main
+                          main
+                          0x7fec32c27740
+                          __libc_start_main
+                          _start
+
+     0.74%  wl_cursor_surfa  libc.so.6                       [.] 0x0000000000093fff
+     0.73%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000143ffe
+            |
+            ---0x7fec33143ffe
+               0x7fec3314a028
+               0x7fec33141b9a
+
+     0.73%  crowd_perf       crowd_perf                      [.] runtime::bounds_check_error
+            |
+            ---runtime::bounds_check_error
+               |          
+                --0.53%--engine::character_frame
+                          engine::draw_sprite
+                          main::main
+                          main
+                          0x7fec32c27740
+                          __libc_start_main
+                          _start
+
+     0.71%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001f41b7
+            |
+            ---0x7fec12df41b7
+               0x7fec12df44e5
+               |          
+                --0.59%--0x7fec12c2baf6
+                          0x7fec12c2da03
+                          0x7fec12c2e4ca
+                          0x7fec12c2f277
+                          0x7fec12de052c
+                          0x7fec12de1521
+                          0x7fec33247581
+                          0x7fec33064bab
+                          engine::end_frame
+                          main::main
+
+     0.70%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000023af6a
+            |
+            ---0x7fec3323af6a
+               |          
+                --0.58%--0x7fec33249f38
+                          engine::end_frame
+                          main::main
+                          main
+                          0x7fec32c27740
+                          __libc_start_main
+                          _start
+
+     0.69%  crowd_perf       crowd_perf                      [.] engine::frame_uvs
+            |
+            ---engine::frame_uvs
+               engine::draw_sprite
+               main::main
+               main
+               0x7fec32c27740
+               __libc_start_main
+               _start
+
+     0.68%  crowd_perf       libc.so.6                       [.] 0x000000000009ca5c
+            |
+            ---0x7fec32c9ca5c
+
+     0.67%  crowd_perf       [vdso]                          [.] __vdso_clock_gettime
+            |
+            ---__vdso_clock_gettime
+               clock_gettime
+
+     0.58%  crowd_perf       libdrm.so.2.134.0               [.] drmIoctl
+     0.58%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000033b80b
+            |
+            ---0x7fec12f3b80b
+               0x7fec12df41ce
+               0x7fec12df44e5
+
+     0.53%  crowd_perf       libc.so.6                       [.] cfree
+            |
+            ---cfree
+
+     0.51%  crowd_perf       [unknown]                       [k] 0xffffffff84e00080
+            |
+            ---0xffffffff84e00080
+
+     0.45%  crowd_perf       libc.so.6                       [.] pthread_mutex_unlock
+     0.44%  crowd_perf       libc.so.6                       [.] pthread_rwlock_rdlock
+     0.43%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000d2c23
+     0.40%  crowd_perf       libc.so.6                       [.] 0x0000000000180625
+     0.39%  crowd_perf       libc.so.6                       [.] 0x000000000018a547
+     0.37%  crowd_perf       crowd_perf                      [.] runtime::default_hasher_string
+     0.36%  crowd_perf       libc.so.6                       [.] 0x000000000018a4c0
+     0.35%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000247484
+     0.33%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x0000000000003147
+     0.33%  crowd_perf       libc.so.6                       [.] 0x0000000000189cc4
+     0.33%  crowd_perf       [unknown]                       [k] 0xffffffff84e00084
+     0.31%  wl_cursor_surfa  libc.so.6                       [.] 0x00000000000a44b7
+     0.31%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000110d98
+     0.31%  wl_cursor_surfa  libc.so.6                       [.] 0x000000000018a4f3
+     0.30%  crowd_perf       libc.so.6                       [.] 0x000000000018a4e2
+     0.30%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000e6624
+     0.28%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000033b84d
+     0.28%  crowd_perf       libc.so.6                       [.] 0x00000000000a4524
+     0.28%  crowd_perf       libc.so.6                       [.] malloc
+     0.27%  crowd_perf       crowd_perf                      [.] runtime::map_seed_from_map_data
+     0.27%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001822f7
+     0.26%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000033c9d7
+     0.26%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000be362
+     0.26%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000024cff0
+     0.26%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000cd8a8
+     0.26%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000018d44f
+     0.25%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001d131e
+     0.25%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000116255
+     0.25%  crowd_perf       libdbus-1.so.3.38.3             [.] _dbus_atomic_inc
+     0.25%  crowd_perf       crowd_perf                      [.] __$hasher$$string
+     0.25%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000062360
+     0.25%  crowd_perf       libdrm.so.2.134.0               [.] drmSyncobjTimelineWait
+     0.24%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000022daa
+     0.24%  crowd_perf       libc.so.6                       [.] 0x000000000018a486
+     0.24%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000b7b5f
+     0.24%  crowd_perf       libdbus-1.so.3.38.3             [.] _dbus_message_loader_queue_messages
+     0.24%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000000168f4
+     0.24%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000144008
+     0.24%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000024cd09
+     0.23%  crowd_perf       libc.so.6                       [.] 0x00000000000a45c9
+     0.23%  crowd_perf       crowd_perf                      [.] engine::texture_run_len
+     0.23%  crowd_perf       [unknown]                       [k] 0xffffffff86355a81
+     0.23%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000023af07
+     0.23%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000024d030
+     0.23%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x0000000000003140
+     0.23%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000000166c5
+     0.22%  crowd_perf       libc.so.6                       [.] pthread_rwlock_unlock
+     0.22%  crowd_perf       libc.so.6                       [.] 0x000000000018a4ea
+     0.22%  crowd_perf       libc.so.6                       [.] 0x000000000018a4ca
+     0.22%  crowd_perf       libc.so.6                       [.] 0x000000000009ca36
+     0.22%  crowd_perf       crowd_perf                      [.] engine::begin_frame
+     0.22%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000002501f2
+     0.22%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x00000000000032b2
+     0.22%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000cf9cf
+     0.22%  crowd_perf       libc.so.6                       [.] 0x00000000000a58f9
+     0.22%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e47ac
+     0.21%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x0000000000003263
+     0.21%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e61b8
+     0.21%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x00000000000049dc
+     0.21%  wl_cursor_surfa  libSDL3.so.0.4.12               [.] 0x00000000001cd7b4
+     0.21%  crowd_perf       [unknown]                       [k] 0xffffffff85a7a084
+     0.20%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000d2761
+     0.19%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x0000000000003203
+     0.19%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000002295c
+     0.19%  crowd_perf       libc.so.6                       [.] 0x0000000000190598
+     0.18%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000d33ea
+     0.17%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000000541ae
+     0.17%  crowd_perf       [unknown]                       [k] 0xffffffff855d7847
+     0.17%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000037a095
+     0.17%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000c5b8f
+     0.17%  crowd_perf       libdbus-1.so.3.38.3             [.] 0x0000000000016a5d
+     0.17%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000002ca02
+     0.16%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000181459
+     0.16%  wl_cursor_surfa  libwayland-client.so.0.25.0     [.] wl_display_flush
+     0.16%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000ebd77
+     0.16%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e35cb
+     0.16%  crowd_perf       libdbus-1.so.3.38.3             [.] 0x0000000000031bdf
+     0.16%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000bbf75
+     0.16%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e4a6a
+     0.15%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e4d24
+     0.15%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000016610
+     0.15%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000ed46e
+     0.15%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000018d496
+     0.15%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000b8dea
+     0.15%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000024fd04
+     0.14%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000249f10
+     0.14%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000ba831
+     0.14%  crowd_perf       libc.so.6                       [.] 0x000000000018a55c
+     0.14%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x0000000000003165
+     0.14%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000035f660
+     0.14%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000115185
+     0.14%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000018584
+     0.14%  crowd_perf       libc.so.6                       [.] 0x000000000009ffc4
+     0.14%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000000657d0
+     0.14%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000028528
+     0.14%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x0000000000004cb4
+     0.14%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000021b325
+     0.14%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000013c5ff
+     0.14%  wl_cursor_surfa  libc.so.6                       [.] 0x00000000000a7586
+     0.14%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000016675
+     0.14%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000035f6d0
+     0.14%  crowd_perf       [unknown]                       [k] 0xffffffff855e8fd6
+     0.14%  crowd_perf       libc.so.6                       [.] 0x00000000000a44b7
+     0.14%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000018aae8
+     0.14%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000022b11
+     0.14%  crowd_perf       libdbus-1.so.3.38.3             [.] dbus_connection_ref
+     0.14%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001d9f6f
+     0.14%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001814d7
+     0.14%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000035f634
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000181ee4
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000033cb4a
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000cb17f
+     0.13%  wl_cursor_surfa  libwayland-client.so.0.25.0     [.] wl_display_read_events
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000018c7aa
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000033b7e1
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000c9cb4
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000c5e16
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000017dbbb
+     0.13%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000000f7a33
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000017ea01
+     0.13%  crowd_perf       libnvidia-glcore.so.610.43.03   [.] 0x0000000000fcd46c
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000ccf75
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000002c934
+     0.13%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000000185a9
+     0.13%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x0000000000003193
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000115378
+     0.13%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000062cee
+     0.13%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x00000000000039f1
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000c5525
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001dbca4
+     0.13%  wl_cursor_surfa  libc.so.6                       [.] 0x0000000000094084
+     0.13%  wl_cursor_surfa  libc.so.6                       [.] 0x00000000000a66c4
+     0.13%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000001c8cfd
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000c5b0f
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000116284
+     0.13%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x000000000000320b
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000017d7c4
+     0.13%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000023af40
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000002cd72
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000cd651
+     0.13%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000217945
+     0.12%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000024e846
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000017ff51
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000186261
+     0.12%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000002440cf
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000ebdf7
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001f3ff0
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000cb17b
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001deb23
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001f2e1b
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001f44d1
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001161e8
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000d88e7
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001168fc
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000cea95
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e4771
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000336cae
+     0.12%  crowd_perf       [unknown]                       [k] 0xffffffff84e00087
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000cd7c4
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000b8712
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000010da71
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001dca18
+     0.12%  crowd_perf       libc.so.6                       [.] 0x00000000000a6ed3
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000bf533
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000ceb86
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001166e5
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000068cca2
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000116312
+     0.12%  crowd_perf       libdbus-1.so.3.38.3             [.] _dbus_list_pop_first_link
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000180ab2
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000002336f
+     0.12%  crowd_perf       crowd_perf                      [.] engine::now_seconds
+     0.12%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000024fc98
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001f3ff4
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000116118
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000181449
+     0.12%  crowd_perf       libdrm.so.2.134.0               [.] drmSyncobjWait
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000b707d
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000011621a
+     0.12%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000023c102
+     0.12%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000002469b4
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001d8d26
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000bdcf2
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e4c57
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000c2897
+     0.12%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000023be6f
+     0.12%  crowd_perf       [unknown]                       [k] 0xffffffff84e015f4
+     0.12%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000025442a
+     0.12%  crowd_perf       libc.so.6                       [.] 0x00000000000a6403
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001f3010
+     0.12%  wl_cursor_surfa  libSDL3.so.0.4.12               [.] 0x00000000001e3f78
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e61f1
+     0.12%  crowd_perf       [unknown]                       [k] 0xffffffff85a7a016
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000018d4e4
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000f4af3
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001153f9
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000cb4b9
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000283b6
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000d2d0b
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e6d70
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000115a48
+     0.12%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000024d110
+     0.12%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000017ff7a
+     0.11%  crowd_perf       libc.so.6                       [.] 0x00000000000a5735
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000011416b
+     0.11%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000023aefa
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000cd413
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000068cc64
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000022d88
+     0.11%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000025478f
+     0.11%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000000545e3
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000018c87b
+     0.11%  crowd_perf       libc.so.6                       [.] 0x000000000005bcfd
+     0.11%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x00000000000032a4
+     0.11%  crowd_perf       libdbus-1.so.3.38.3             [.] 0x000000000001aa7b
+     0.11%  wl_cursor_surfa  libc.so.6                       [.] 0x00000000000a674c
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000d6749
+     0.11%  crowd_perf       libffi.so.8.4.1                 [.] 0x0000000000002bf4
+     0.11%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000054e93
+     0.11%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000018567
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000189a35
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000182313
+     0.11%  crowd_perf       libdbus-1.so.3.38.3             [.] 0x000000000003219d
+     0.11%  crowd_perf       libSDL3.so.0.4.12               [.] SDL_UnmapGPUTransferBuffer
+     0.11%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000000176c2
+     0.11%  wl_cursor_surfa  libwayland-client.so.0.25.0     [.] 0x0000000000003689
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000022a03
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000002f38d
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000d2686
+     0.11%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000244358
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000ce843
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001f41d6
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000217e57
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000cca9b
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000022d261
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000ebc8d
+     0.11%  crowd_perf       libc.so.6                       [.] pthread_getspecific
+     0.11%  crowd_perf       libc.so.6                       [.] 0x00000000000a4520
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000c0133
+     0.11%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000000176d1
+     0.11%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000002475f1
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000035f6c7
+     0.11%  wl_cursor_surfa  libc.so.6                       [.] 0x00000000000a661d
+     0.11%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000246fbc
+     0.11%  wl_cursor_surfa  libc.so.6                       [.] pthread_mutex_lock
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000c4a78
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000d227c
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000cf034
+     0.11%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000016e32
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000b91fb
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e6228
+     0.11%  crowd_perf       libc.so.6                       [.] 0x0000000000189c5a
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000b7a68
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001f2b1b
+     0.11%  crowd_perf       libc.so.6                       [.] __libc_calloc
+     0.11%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000c5ba8
+     0.11%  crowd_perf       libc.so.6                       [.] 0x0000000000189c6e
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000033c9cd
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000bc661
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000022a90
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000d2ed4
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000cfbdd
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001158db
+     0.10%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x000000000000315e
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000c5b36
+     0.10%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x000000000000326e
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000013c87e
+     0.10%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000062c29
+     0.10%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000024e2b6
+     0.10%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000023be24
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000197523
+     0.10%  crowd_perf       libwayland-client.so.0.25.0     [.] wl_display_prepare_read_queue
+     0.10%  crowd_perf       libc.so.6                       [.] 0x00000000000a57e4
+     0.10%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000002441e6
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000cd71c
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000018c8b9
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001cfb14
+     0.10%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000067a27
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000022ddf5
+     0.10%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000254752
+     0.10%  crowd_perf       libc.so.6                       [.] 0x000000000009ca4f
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000189e7f
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001f2d44
+     0.10%  crowd_perf       libc.so.6                       [.] 0x0000000000183444
+     0.10%  crowd_perf       libc.so.6                       [.] ioctl
+     0.10%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000001662f
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000d3c1f
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000ed479
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e4e14
+     0.10%  wl_cursor_surfa  libSDL3.so.0.4.12               [.] 0x00000000001e3f76
+     0.10%  crowd_perf       libwayland-client.so.0.25.0     [.] wl_list_empty
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000d6c8b
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000193681
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001dd4e5
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000018d452
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000028474
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000bc657
+     0.10%  crowd_perf       libdbus-1.so.3.38.3             [.] dbus_connection_get_dispatch_status
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000068fe91
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000017e9d8
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000fa720
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000013d041
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000033b851
+     0.10%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e3616
+     0.09%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000024f5a2
+     0.09%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000025445f
+     0.09%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000cb359
+     0.09%  crowd_perf       libc.so.6                       [.] strchrnul@plt
+     0.09%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000d3493
+     0.09%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000022b67
+     0.09%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000116982
+     0.09%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000035f664
+     0.09%  crowd_perf       libc.so.6                       [.] 0x0000000000189c47
+     0.08%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x00000000000031c3
+     0.08%  crowd_perf       libc.so.6                       [.] 0x00000000000a66c4
+     0.08%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000ebd95
+     0.08%  crowd_perf       libc.so.6                       [.] 0x00000000000a5750
+     0.08%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000ce980
+     0.08%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000115f93
+     0.08%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000018d5e9
+     0.08%  wl_cursor_surfa  libc.so.6                       [.] 0x000000000009ca5c
+     0.07%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000018aaf9
+     0.07%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000c4a6a
+     0.07%  wl_cursor_surfa  libSDL3.so.0.4.12               [.] 0x00000000001cd7b1
+     0.07%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e4e3e
+     0.06%  wl_cursor_surfa  libwayland-client.so.0.25.0     [.] wl_list_insert
+     0.06%  wl_cursor_surfa  libc.so.6                       [.] 0x00000000000a6ed3
+     0.03%  crowd_perf       libxkbcommon.so.0.13.2          [.] 0x00000000000084b7
+     0.03%  wl_cursor_surfa  libc.so.6                       [.] 0x00000000000a6f67
+     0.02%  crowd_perf       libc.so.6                       [.] 0x0000000000189d47
+     0.02%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e5074
+     0.02%  crowd_perf       ld-linux-x86-64.so.2            [.] 0x000000000000ac3a
+     0.01%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000182d8f
+     0.00%  crowd_perf       libc.so.6                       [.] __cxa_finalize
+     0.00%  wl_cursor_surfa  libc.so.6                       [.] pthread_cond_broadcast
+     0.00%  wl_cursor_surfa  [unknown]                       [k] 0xffffffff84e00080
+     0.00%  crowd_perf       libc.so.6                       [.] 0x00000000000a7681
+     0.00%  wl_cursor_surfa  libwayland-client.so.0.25.0     [.] 0x00000000000036ef
+     0.00%  crowd_p:disk$0   libc.so.6                       [.] pthread_cond_wait
+     0.00%  wl_cursor_surfa  libwayland-client.so.0.25.0     [.] 0x0000000000003621
+     0.00%  crowd_perf       libc.so.6                       [.] 0x00000000000534eb
+     0.00%  crowd_perf       libdbus-1.so.3.38.3             [.] 0x0000000000037c44
+     0.00%  wl_cursor_surfa  libc.so.6                       [.] 0x000000000009ca21
+     0.00%  wl_cursor_surfa  libc.so.6                       [.] ppoll
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000002d5ba
+     0.00%  crowd_perf       libSDL3.so.0.4.12               [.] 0x00000000000670f4
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000037a011
+     0.00%  crowd_perf       libc.so.6                       [.] 0x0000000000189cf7
+     0.00%  crowd_perf       ld-linux-x86-64.so.2            [.] 0x0000000000015951
+     0.00%  crowd_perf       libSDL3.so.0.4.12               [.] 0x000000000024e620
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001f2f92
+     0.00%  wl_cursor_surfa  libc.so.6                       [.] 0x00000000000a4463
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000001e56c
+     0.00%  crowd_perf       libdbus-1.so.3.38.3             [.] 0x000000000001004a
+     0.00%  wl_cursor_surfa  libwayland-client.so.0.25.0     [.] 0x00000000000031c3
+     0.00%  crowd_perf       ld-linux-x86-64.so.2            [.] 0x0000000000014887
+     0.00%  crowd_perf       libc.so.6                       [.] 0x000000000005b734
+     0.00%  crowd_perf       libc.so.6                       [.] 0x000000000005bd50
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001e3e38
+     0.00%  crowd_perf       libc.so.6                       [.] 0x0000000000064b99
+     0.00%  crowd_perf       libc.so.6                       [.] 0x000000000005a244
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000345b18
+     0.00%  crowd_perf       libc.so.6                       [.] __ctype_init
+     0.00%  crowd_perf       [unknown]                       [k] 0xffffffff86355a14
+     0.00%  crowd_perf       [unknown]                       [k] 0xffffffff86355a10
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000345ce7
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000345adb
+     0.00%  crowd_perf       libnvidia-gpucomp.so.610.43.03  [.] 0x0000000000654f48
+     0.00%  wl_cursor_surfa  libSDL3.so.0.4.12               [.] 0x00000000001e3f74
+     0.00%  crowd_perf       libc.so.6                       [.] __errno_location
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000ca8f2
+     0.00%  crowd_perf       libnvidia-gpucomp.so.610.43.03  [.] 0x0000000001961f52
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000345837
+     0.00%  crowd_perf       libc.so.6                       [.] pthread_self
+     0.00%  wl_cursor_surfa  [unknown]                       [k] 0xffffffff852a9115
+     0.00%  crowd_perf       libc.so.6                       [.] 0x0000000000103a63
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000018d575
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000345cfe
+     0.00%  crowd_perf       libc.so.6                       [.] 0x0000000000097417
+     0.00%  crowd_perf       libc.so.6                       [.] 0x000000000009741b
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001166ae
+     0.00%  crowd_perf       [unknown]                       [k] 0xffffffff84e015f0
+     0.00%  crowd_perf       libwayland-client.so.0.25.0     [.] wl_display_dispatch_queue_timeout
+     0.00%  crowd_perf       libc.so.6                       [.] 0x0000000000185400
+     0.00%  crowd_perf       ld-linux-x86-64.so.2            [.] 0x0000000000008b5e
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000022edc
+     0.00%  crowd_perf       libSDL3.so.0.4.12               [.] 0x0000000000018892
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000028ed39
+     0.00%  wl_cursor_surfa  libc.so.6                       [.] 0x0000000000094040
+     0.00%  crowd_perf       libc.so.6                       [.] sendmsg
+     0.00%  crowd_perf       [unknown]                       [k] 0xffffffff84e01280
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000344ddb
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000345bb3
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000344ddd
+     0.00%  crowd_perf       libc.so.6                       [.] 0x000000000011bed0
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000344cd4
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000345ad6
+     0.00%  crowd_perf       libc.so.6                       [.] 0x0000000000094047
+     0.00%  crowd_perf       libc.so.6                       [.] 0x00000000000973a0
+     0.00%  crowd_perf       libc.so.6                       [.] 0x0000000000103a40
+     0.00%  wl_cursor_surfa  libc.so.6                       [.] 0x0000000000094047
+     0.00%  crowd_perf       libc.so.6                       [.] __poll
+     0.00%  crowd_perf       libc.so.6                       [.] 0x00000000000973a4
+     0.00%  crowd_perf       libdbus-1.so.3.38.3             [.] 0x0000000000032197
+     0.00%  crowd_perf       [unknown]                       [k] 0xffffffff84e01630
+     0.00%  crowd_perf       ld-linux-x86-64.so.2            [.] 0x000000000000932e
+     0.00%  crowd_perf       ld-linux-x86-64.so.2            [.] 0x0000000000009339
+     0.00%  crowd_perf       ld-linux-x86-64.so.2            [.] 0x000000000001f103
+     0.00%  crowd_perf       libc.so.6                       [.] ppoll
+     0.00%  crowd_perf       libc.so.6                       [.] realloc
+     0.00%  crowd_perf       libc.so.6                       [.] 0x0000000000094040
+     0.00%  crowd_perf       libc.so.6                       [.] 0x0000000000094084
+     0.00%  crowd_perf       libc.so.6                       [.] 0x00000000000a78dc
+     0.00%  crowd_perf       libnvidia-glcore.so.610.43.03   [.] 0x00000000009e786b
+     0.00%  crowd_perf       libnvidia-gpucomp.so.610.43.03  [.] 0x0000000000455dd3
+     0.00%  crowd_perf       libnvidia-gpucomp.so.610.43.03  [.] 0x000000000067d1b0
+     0.00%  crowd_perf       libnvidia-gpucomp.so.610.43.03  [.] 0x000000000067d1c2
+     0.00%  crowd_perf       libnvidia-gpucomp.so.610.43.03  [.] 0x0000000001956940
+     0.00%  crowd_perf       libnvidia-gpucomp.so.610.43.03  [.] 0x000000000195a141
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000022e9e
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000022ea7
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000022ebd
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000bafc5
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000ca918
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000000ca91f
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000011666f
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001166a8
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001f2dbf
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x00000000001f2dd0
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000028ece4
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000028ed0d
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x0000000000345bb0
+     0.00%  crowd_perf       libvulkan_radeon.so             [.] 0x000000000068d01a
+     0.00%  crowd_perf       libwayland-client.so.0.25.0     [.] 0x0000000000003aa8
+     0.00%  crowd_perf       [unknown]                       [k] 0xffffffff84e01670
+     0.00%  crowd_perf       [unknown]                       [k] 0xffffffff84e01690
+     0.00%  wl_cursor_surfa  libc.so.6                       [.] 0x0000000000094050
+     0.00%  wl_cursor_surfa  libc.so.6                       [.] 0x0000000000094085
+     0.00%  wl_cursor_surfa  libc.so.6                       [.] 0x000000000009fff2
+     0.00%  wl_cursor_surfa  libwayland-client.so.0.25.0     [.] 0x0000000000004524
+     0.00%  wl_cursor_surfa  [unknown]                       [k] 0xffffffff84e01630
+
+
+#
+# (Tip: For tracepoint events, try: perf report -s trace_fields)
+#

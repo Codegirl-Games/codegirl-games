@@ -27,7 +27,7 @@ help:
 	@echo "  camera_sandbox   Pan camera / Space toggles follow"
 	@echo "  clips            Keys 1/2 switch idle/walk"
 	@echo "  flame            Build+record+SVG+JPG+text report (FLAME_EXAMPLE=$(FLAME_EXAMPLE))"
-	@echo "  flame-build      Debug binary only ($(FLAME_BIN))"
+	@echo "  flame-build      Optimized debug binary ($(FLAME_BIN))"
 	@echo "  flame-record     perf record (play, then quit)"
 	@echo "  flame-svg        Convert perf.data -> $(FLAME_PREFIX).svg/.jpg"
 	@echo "  flame-report     Convert perf.data -> $(FLAME_PREFIX)-report.txt"
@@ -79,7 +79,7 @@ flame-tools:
 	fi
 
 flame-build:
-	odin build examples/$(FLAME_EXAMPLE) -collection:pkg=. -out:$(FLAME_BIN) -debug
+	odin build examples/$(FLAME_EXAMPLE) -collection:pkg=. -out:$(FLAME_BIN) -debug -o:speed
 
 flame-record: flame-build
 	@echo ">>> Profiling ./$(FLAME_BIN) — play for ~10–20s under load, then quit the window."
