@@ -93,9 +93,28 @@ These results are from a software Vulkan backend. Hardware drivers may have a
 different balance, which is another reason to keep the benchmark reproducible
 and report backend details.
 
-## Proposed change
+## Suggested fix
 
 Add a non-interactive benchmark target with two explicitly separate workloads.
+
+Add dedicated Makefile targets that always build optimized benchmark code:
+
+```make
+PERF_ITERATIONS ?= 2000000
+PERF_FRAMES ?= 1000
+
+perf-draw:
+	odin run examples/draw_bench \
+		-collection:pkg=. \
+		-debug -o:speed \
+		-define:PERF_ITERATIONS=$(PERF_ITERATIONS)
+
+perf-frame:
+	odin run examples/frame_bench \
+		-collection:pkg=. \
+		-debug -o:speed \
+		-define:PERF_FRAMES=$(PERF_FRAMES)
+```
 
 ### CPU queue benchmark
 
@@ -108,6 +127,28 @@ Add a non-interactive benchmark target with two explicitly separate workloads.
 - Run at least one million calls and report nanoseconds per draw.
 - Build with `-o:speed` by default.
 
+The measured loop should clear the queue at its cap, vary input to prevent
+compiler hoisting, and report time per draw:
+
+```odin
+PERF_ITERATIONS :: #config(PERF_ITERATIONS, 2_000_000)
+
+start := sdl.GetTicksNS()
+for i in 0 ..< PERF_ITERATIONS {
+	if len(app.draw_list) == eng.MAX_SPRITES {
+		clear(&app.draw_list)
+	}
+	sprite.position.x = f32(i & 1023)
+	eng.draw_sprite(&app, &sprite)
+}
+elapsed := sdl.GetTicksNS() - start
+
+fmt.printfln(
+	"%.3f ns/draw",
+	f64(elapsed) / f64(PERF_ITERATIONS),
+)
+```
+
 ### Full-frame benchmark
 
 - Use a real SDL GPU device and baked texture.
@@ -116,6 +157,27 @@ Add a non-interactive benchmark target with two explicitly separate workloads.
 - Report milliseconds per frame and sprites per second.
 - Record GPU backend, present mode, compiler version, compiler flags, and sprite
   count.
+
+Use a fixed frame count rather than an interactive quit time:
+
+```odin
+PERF_FRAMES :: #config(PERF_FRAMES, 1_000)
+
+for _ in 0 ..< 100 {
+	draw_benchmark_frame(&app, sprites[:]) // warm-up
+}
+
+start := sdl.GetTicksNS()
+for _ in 0 ..< PERF_FRAMES {
+	draw_benchmark_frame(&app, sprites[:])
+}
+elapsed := sdl.GetTicksNS() - start
+
+fmt.printfln(
+	"%.3f ms/frame",
+	f64(elapsed) / f64(PERF_FRAMES) / 1_000_000.0,
+)
+```
 
 The CPU benchmark should be available without a display or GPU. The full-frame
 benchmark may remain opt-in where a suitable GPU backend is unavailable.

@@ -55,27 +55,57 @@ Environment:
 - Optimized with `-debug -o:speed`
 - Linux x86-64
 
-## Proposed change
+## Suggested fix
 
 Compute clip scaling once and construct corners from the unique coordinates:
 
 ```odin
-sx := 2.0 / f32(app.swapchain_w)
-sy := 2.0 / f32(app.swapchain_h)
+sprite_quad_to_clip :: proc(x0, y0, x1, y1, sw, sh: f32) -> [4]Vec2 {
+	sx := 2.0 / sw
+	sy := 2.0 / sh
 
-left   := x0_px * sx - 1
-right  := x1_px * sx - 1
-top    := 1 - y0_px * sy
-bottom := 1 - y1_px * sy
+	left   := x0 * sx - 1
+	right  := x1 * sx - 1
+	top    := 1 - y0 * sy
+	bottom := 1 - y1 * sy
 
-p0 := Vec2{left, top}
-p1 := Vec2{right, top}
-p2 := Vec2{right, bottom}
-p3 := Vec2{left, bottom}
+	return {
+		{left, top},
+		{right, top},
+		{right, bottom},
+		{left, bottom},
+	}
+}
+
+points := sprite_quad_to_clip(x0_px, y0_px, x1_px, y1_px, sw, sh)
+p0, p1, p2, p3 := points[0], points[1], points[2], points[3]
 ```
 
 Keep `to_clip` for general callers and its existing tests; this change only
 specializes quad construction inside `draw_sprite`.
+
+Add an equivalence test before replacing the current calls:
+
+```odin
+@(test)
+sprite_quad_clip_math_matches_to_clip :: proc(t: ^testing.T) {
+	x0, y0 := f32(125), f32(80)
+	x1, y1 := f32(325), f32(280)
+	sw, sh := f32(800), f32(600)
+
+	expected := [4]Vec2 {
+		to_clip(x0, y0, sw, sh),
+		to_clip(x1, y0, sw, sh),
+		to_clip(x1, y1, sw, sh),
+		to_clip(x0, y1, sw, sh),
+	}
+	actual := sprite_quad_to_clip(x0, y0, x1, y1, sw, sh)
+
+	for i in 0 ..< 4 {
+		testing.expect_value(t, actual[i], expected[i])
+	}
+}
+```
 
 ## Acceptance criteria
 

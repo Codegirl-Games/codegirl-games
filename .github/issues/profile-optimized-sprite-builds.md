@@ -47,7 +47,7 @@ Environment:
 - SDL 3.4.12
 - Linux x86-64
 
-## Proposed change
+## Suggested fix
 
 Compile profiling binaries with optimization while retaining symbols:
 
@@ -55,12 +55,24 @@ Compile profiling binaries with optimization while retaining symbols:
 FLAME_ODIN_FLAGS ?= -debug -o:speed
 
 flame-build:
-	odin build examples/$(FLAME_EXAMPLE) -collection:pkg=. \
-		-out:$(FLAME_BIN) $(FLAME_ODIN_FLAGS)
+	odin build examples/$(FLAME_EXAMPLE) \
+		-collection:pkg=. \
+		-out:$(FLAME_BIN) \
+		$(FLAME_ODIN_FLAGS)
 ```
 
 Keeping the flags configurable allows an explicitly unoptimized diagnostic run
 without making it the performance default.
+
+Example usage:
+
+```bash
+# Representative performance profile: optimized code with debug symbols.
+make flame FLAME_EXAMPLE=crowd
+
+# Explicitly profile unoptimized code when investigating debug-only behavior.
+make flame FLAME_EXAMPLE=crowd FLAME_ODIN_FLAGS="-debug -o:none"
+```
 
 Consider applying an explicit optimization mode to performance-oriented example
 runs as well. Plain `odin run` currently uses Odin's unoptimized default.
