@@ -53,3 +53,36 @@ camera_sandbox:
 
 clips:
 	odin run examples/clips -collection:pkg=.
+<<<<<<< Updated upstream
+=======
+
+flame-tools:
+	@if [ ! -x "$(FLAMEGRAPH_DIR)/stackcollapse-perf.pl" ] || [ ! -x "$(FLAMEGRAPH_DIR)/flamegraph.pl" ]; then \
+		echo "Cloning FlameGraph scripts into $(FLAMEGRAPH_DIR)..."; \
+		git clone --depth 1 https://github.com/brendangregg/FlameGraph.git "$(FLAMEGRAPH_DIR)"; \
+	fi
+
+flame-build:
+	odin build examples/$(FLAME_EXAMPLE) -collection:pkg=. -out:$(FLAME_BIN) -debug -o:speed
+
+flame-record: flame-build
+	@echo ">>> Profiling ./$(FLAME_BIN) — play for ~10–20s under load, then quit the window."
+	@echo ">>> If perf fails with permissions: sudo sysctl kernel.perf_event_paranoid=1"
+	perf record -F 99 -g --call-graph dwarf -- ./$(FLAME_BIN)
+
+flame-svg: flame-tools
+	@test -f perf.data || { echo "No perf.data — run: make flame-record"; exit 1; }
+	@mkdir -p "$(FLAME_OUT_DIR)"
+	perf script | "$(FLAMEGRAPH_DIR)/stackcollapse-perf.pl" | "$(FLAMEGRAPH_DIR)/flamegraph.pl" > "$(FLAME_PREFIX).svg"
+	magick "$(FLAME_PREFIX).svg" "$(FLAME_PREFIX).jpg"
+	@echo "Wrote $(FLAME_PREFIX).svg and $(FLAME_PREFIX).jpg"
+
+flame-report:
+	@test -f perf.data || { echo "No perf.data — run: make flame-record"; exit 1; }
+	@mkdir -p "$(FLAME_OUT_DIR)"
+	perf report --stdio --no-children > "$(FLAME_PREFIX)-report.txt"
+	@echo "Wrote $(FLAME_PREFIX)-report.txt"
+
+flame: flame-record flame-svg flame-report
+	@echo "Artifacts: $(FLAME_PREFIX).{svg,jpg} $(FLAME_PREFIX)-report.txt"
+>>>>>>> Stashed changes
