@@ -37,6 +37,62 @@ may have a different balance.
 This split also explains why percentages from the current unoptimized
 flamegraphs overstate small helper functions.
 
+### Follow-up enhancement benchmarks
+
+Six proposed renderer changes were implemented temporarily and measured before
+being discarded. Full-frame tests used:
+
+- Odin `dev-2026-05-nightly:ea5175d`
+- `-debug -o:speed`
+- SDL 3.4.12 with Vulkan/Lavapipe
+- 128 animated sprites using real baked toad metadata and textures
+- Warm-up before measurement
+- Paired baseline/change samples on the same device with alternating order
+- Ten 400-frame samples per mode, except culling, which used seven 750-frame
+  samples per mode
+
+Each row is a separate paired run, so absolute frame times should only be
+compared within that row.
+
+| Enhancement | Baseline median | Changed median | Result |
+| --- | ---: | ---: | ---: |
+| Viewport culling, all visible | 4.845 ms | 4.822 ms | 0.5% faster |
+| Viewport culling, 50% offscreen | 2.856 ms | 2.878 ms | 0.8% slower |
+| SDL transfer and vertex buffer cycling | 4.869 ms | 4.834 ms | 0.7% faster |
+| Contiguous vertex queue and one upload-side copy | 4.793 ms | 4.809 ms | 0.3% slower |
+| Four-vertex indexed quads | 4.745 ms | 4.830 ms | 1.8% slower |
+| GPU instancing with 32-byte instance records | 5.527 ms | 5.467 ms | 1.1% faster |
+| Texture sorting, including sort cost, 128 runs to 2 | 5.765 ms | 5.654 ms | 1.9% faster |
+
+Interpretation:
+
+- Viewport culling is neutral at the current cap. The GPU already clips
+  offscreen triangles, and the sprites remain in one batched draw.
+- SDL buffer cycling is a small performance improvement and is also the
+  documented way to avoid overwriting resources still bound by prior frames.
+- Repacking the CPU queue does not help at 128 sprites; extra dynamic-array
+  work offsets the saved small-copy loop.
+- Indexed quads regress performance despite reducing dynamic vertex data.
+- Instancing reduces per-sprite upload data from 96 to 32 bytes, but the 1.1%
+  gain does not justify a second pipeline and shader path at the current cap.
+- Texture sorting has the largest full-frame gain, but unrestricted sorting can
+  change alpha compositing. It is only safe within compatible layer/order
+  groups.
+
+The recommended order is:
+
+1. Profile optimized builds and establish the deterministic benchmark.
+2. Apply the clip-space math simplification documented in the related issue.
+3. Enable SDL buffer cycling for correct cross-frame resource reuse.
+4. Consider layer-aware texture grouping if a 1.9% workload-specific gain is
+   worth the ordering complexity.
+5. Defer culling, queue repacking, indexed quads, and instancing until the
+   sprite limit or measured workload grows substantially.
+
+These results are from a software Vulkan backend. Hardware drivers may have a
+different balance, which is another reason to keep the benchmark reproducible
+and report backend details.
+
 ## Proposed change
 
 Add a non-interactive benchmark target with two explicitly separate workloads.

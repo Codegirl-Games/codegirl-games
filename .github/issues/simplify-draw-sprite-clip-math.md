@@ -42,6 +42,13 @@ microseconds per completely full frame. GPU/driver work dominated the
 end-to-end benchmark, so this should follow the profiling and deterministic
 benchmark improvements.
 
+Follow-up paired full-frame experiments at the 128-sprite cap found no larger
+renderer-architecture win: buffer cycling improved median frame time by 0.7%,
+GPU instancing by 1.1%, and texture sorting by 1.9%, while culling, queue
+repacking, and indexed quads were neutral or slower. The clip-space change
+therefore remains the strongest measured optimization specifically inside
+`draw_sprite`, although its absolute frame impact is still small.
+
 Environment:
 
 - Odin `dev-2026-05-nightly:ea5175d`
