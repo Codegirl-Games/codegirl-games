@@ -1,0 +1,81 @@
+# Reduce repeated clip-space work in `draw_sprite`
+
+## Summary
+
+`draw_sprite` calls `to_clip` four times for an axis-aligned quad:
+
+```odin
+p0 := to_clip(x0_px, y0_px, sw, sh)
+p1 := to_clip(x1_px, y0_px, sw, sh)
+p2 := to_clip(x1_px, y1_px, sw, sh)
+p3 := to_clip(x0_px, y1_px, sw, sh)
+```
+
+This repeats the same divisions and converts duplicate x/y coordinates. An
+axis-aligned sprite has only two unique x values and two unique y values.
+
+This is a measurable optimization, but it is low priority at the current
+128-sprite limit because the absolute saving is small.
+
+## Evidence
+
+The checked-in unoptimized profiles report `engine::to_clip` at 5.33% and 5.51%
+self time. Those percentages are inflated by the unoptimized profiling build,
+so the change was also measured with `-debug -o:speed`.
+
+A temporary benchmark used the real baked toad metadata, changed sprite
+position on every iteration, preallocated the queue, and performed two million
+draws per mode over seven trials:
+
+| Mode | Median time per draw |
+| --- | ---: |
+| Current `draw_sprite` | 25.128 ns |
+| Precomputed clip scale and reused coordinates | 21.531 ns |
+| Same math plus cached `Frame_Def` | 21.778 ns |
+
+Simplifying the math improved isolated draw time by approximately **14.3%**.
+Caching the resolved frame did not provide an additional benefit and should not
+be included without new evidence.
+
+At `MAX_SPRITES == 128`, the measured math saving is only about 0.46
+microseconds per completely full frame. GPU/driver work dominated the
+end-to-end benchmark, so this should follow the profiling and deterministic
+benchmark improvements.
+
+Environment:
+
+- Odin `dev-2026-05-nightly:ea5175d`
+- Optimized with `-debug -o:speed`
+- Linux x86-64
+
+## Proposed change
+
+Compute clip scaling once and construct corners from the unique coordinates:
+
+```odin
+sx := 2.0 / f32(app.swapchain_w)
+sy := 2.0 / f32(app.swapchain_h)
+
+left   := x0_px * sx - 1
+right  := x1_px * sx - 1
+top    := 1 - y0_px * sy
+bottom := 1 - y1_px * sy
+
+p0 := Vec2{left, top}
+p1 := Vec2{right, top}
+p2 := Vec2{right, bottom}
+p3 := Vec2{left, bottom}
+```
+
+Keep `to_clip` for general callers and its existing tests; this change only
+specializes quad construction inside `draw_sprite`.
+
+## Acceptance criteria
+
+- Existing sprite geometry, camera, UV, and batching tests pass.
+- Add or extend a test that compares all four generated corners against
+  `to_clip` for representative viewport and sprite coordinates.
+- Flipped and unflipped sprites produce identical vertices to the current code.
+- An optimized deterministic benchmark shows at least a 10% improvement in
+  isolated `draw_sprite` time under comparable conditions.
+- Do not add a per-sprite frame cache as part of this issue.
