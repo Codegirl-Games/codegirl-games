@@ -21,8 +21,10 @@ PERF_FRAME_SPRITES ?= 128
 PERF_FRAME_FRAMES ?= 400
 PERF_FRAME_WARMUP ?= 100
 PERF_FRAME_TRIALS ?= 10
-# 0=visible, 1=half offscreen, 2=alternating textures
+# 0=visible, 1=half offscreen, 2=alternating textures, 3=stacked
 PERF_FRAME_SCENARIO ?= 0
+PERF_FRAME_WIDTH ?= 800
+PERF_FRAME_HEIGHT ?= 600
 
 help:
 	@echo "Targets:"
@@ -44,7 +46,7 @@ help:
 	@echo "  flame-svg        Convert perf.data -> $(FLAME_PREFIX).svg/.jpg"
 	@echo "  flame-report     Convert perf.data -> $(FLAME_PREFIX)-report.txt"
 	@echo "  perf-draw        Deterministic CPU draw benchmark"
-	@echo "  perf-frame       Deterministic SDL GPU frame benchmark (scenario 0/1/2)"
+	@echo "  perf-frame       Deterministic SDL GPU frame benchmark (scenario 0/1/2/3)"
 
 bake:
 	./scripts/bake_all.sh
@@ -89,7 +91,9 @@ perf-frame:
 		-define:PERF_FRAMES=$(PERF_FRAME_FRAMES) \
 		-define:PERF_WARMUP_FRAMES=$(PERF_FRAME_WARMUP) \
 		-define:PERF_TRIALS=$(PERF_FRAME_TRIALS) \
-		-define:PERF_SCENARIO=$(PERF_FRAME_SCENARIO)
+		-define:PERF_SCENARIO=$(PERF_FRAME_SCENARIO) \
+		-define:PERF_WIDTH=$(PERF_FRAME_WIDTH) \
+		-define:PERF_HEIGHT=$(PERF_FRAME_HEIGHT)
 
 toad:
 	odin run examples/toad -collection:pkg=.

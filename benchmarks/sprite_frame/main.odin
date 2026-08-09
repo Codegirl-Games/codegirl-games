@@ -9,14 +9,14 @@ PERF_FRAMES       :: #config(PERF_FRAMES, 400)
 PERF_WARMUP_FRAMES :: #config(PERF_WARMUP_FRAMES, 100)
 PERF_TRIALS       :: #config(PERF_TRIALS, 10)
 PERF_SCENARIO     :: #config(PERF_SCENARIO, 0)
-
-WINDOW_WIDTH  :: 800
-WINDOW_HEIGHT :: 600
+PERF_WIDTH        :: #config(PERF_WIDTH, 800)
+PERF_HEIGHT       :: #config(PERF_HEIGHT, 600)
 
 Scenario :: enum {
 	Visible,
 	Half_Offscreen,
 	Alternating_Textures,
+	Stacked,
 }
 
 @(private)
@@ -46,6 +46,8 @@ scenario_name :: proc(scenario: Scenario) -> string {
 		return "half_offscreen"
 	case .Alternating_Textures:
 		return "alternating_textures"
+	case .Stacked:
+		return "stacked"
 	}
 	return "unknown"
 }
@@ -80,12 +82,14 @@ main :: proc() {
 	#assert(PERF_FRAMES > 0)
 	#assert(PERF_WARMUP_FRAMES > 0)
 	#assert(PERF_TRIALS > 0)
-	#assert(PERF_SCENARIO >= 0 && PERF_SCENARIO <= 2)
+	#assert(PERF_SCENARIO >= 0 && PERF_SCENARIO <= 3)
+	#assert(PERF_WIDTH > 0)
+	#assert(PERF_HEIGHT > 0)
 
 	scenario := Scenario(PERF_SCENARIO)
 
 	app: eng.App
-	if !eng.init(&app, "sprite frame benchmark", WINDOW_WIDTH, WINDOW_HEIGHT) {
+	if !eng.init(&app, "sprite frame benchmark", PERF_WIDTH, PERF_HEIGHT) {
 		return
 	}
 	defer eng.shutdown(&app)
@@ -113,6 +117,8 @@ main :: proc() {
 		}
 		if scenario == .Half_Offscreen && (i & 1) == 1 {
 			position = {-10_000, -10_000}
+		} else if scenario == .Stacked {
+			position = {f32(PERF_WIDTH / 2), f32(PERF_HEIGHT / 2)}
 		}
 		sprites[i] = eng.spawn_sprite(data, position, "walk", i % 17)
 	}
@@ -129,8 +135,8 @@ main :: proc() {
 		"benchmark=sprite_frame scenario=%s sprites=%d resolution=%dx%d frames=%d warmup=%d trials=%d backend=%v driver=%s present=%s",
 		scenario_name(scenario),
 		PERF_SPRITES,
-		WINDOW_WIDTH,
-		WINDOW_HEIGHT,
+		PERF_WIDTH,
+		PERF_HEIGHT,
 		PERF_FRAMES,
 		PERF_WARMUP_FRAMES,
 		PERF_TRIALS,
