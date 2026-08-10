@@ -89,7 +89,12 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 	if sprite == nil || sprite.data == nil || sprite.data.texture == nil {
 		return
 	}
-	if len(app.draw_list) >= MAX_SPRITES {
+	// Reserve room for the engine FPS overlay glyphs when enabled.
+	max_game := MAX_SPRITES
+	if app.show_fps && app.fps_texture != nil {
+		max_game -= FPS_OVERLAY_MAX_GLYPHS
+	}
+	if len(app.draw_list) >= max_game {
 		return
 	}
 

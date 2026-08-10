@@ -11,7 +11,7 @@ Vertex :: struct {
 }
 
 SPRITE_VERT_COUNT :: 6
-MAX_SPRITES :: 128
+MAX_SPRITES :: 1012 // 1000 game sprites + FPS overlay glyphs
 SPRITE_VERTS_SIZE :: SPRITE_VERT_COUNT * size_of(Vertex)
 VERTEX_BUFFER_SIZE :: MAX_SPRITES * SPRITE_VERTS_SIZE
 
@@ -36,6 +36,12 @@ App :: struct {
 	draw_list:         [dynamic]Queued_Sprite,
 	clear_color:       sdl.FColor,
 	camera:            Camera,
+	show_fps:          bool,
+	fps_texture:       ^sdl.GPUTexture,
+	fps_smooth:        f32,
+	fps_display:       int,
+	fps_last_time:     f64,
+	fps_update_accum:  f32,
 }
 
 Shader_Backend :: enum {
@@ -140,6 +146,10 @@ init :: proc(app: ^App, title: cstring, width, height: i32) -> bool {
 
 	app.camera = camera_default()
 
+	if !fps_overlay_init(app) {
+		fmt.eprintfln("fps overlay init failed; continuing without on-screen FPS")
+	}
+
 	return true
 }
 
@@ -151,6 +161,8 @@ shutdown :: proc(app: ^App) {
 		if !ok {
 			fmt.eprintfln("WaitForGPUIdle failed")
 		}
+
+		fps_overlay_shutdown(app)
 
 		if app.transfer_buffer != nil {
 			sdl.ReleaseGPUTransferBuffer(app.device, app.transfer_buffer)
@@ -195,6 +207,8 @@ events :: proc() -> bool {
 }
 
 begin_frame :: proc(app: ^App, clear_color: sdl.FColor = {0.12, 0.12, 0.16, 1}) {
+	fps_overlay_begin_frame(app)
+
 	clear(&app.draw_list)
 	app.clear_color = clear_color
 	app.render_pass = nil
@@ -240,6 +254,8 @@ end_frame :: proc(app: ^App) {
 		}
 		return
 	}
+
+	fps_overlay_queue(app)
 
 	n := len(app.draw_list)
 	if n > 0 {
