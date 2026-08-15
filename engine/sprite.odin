@@ -183,6 +183,17 @@ set_sprite_clip :: proc(sprite: ^Sprite, clip: string) {
 	def, ok := character_clip(sprite.data, clip)
 	if !ok do return
 
+	set_sprite_clip_def(sprite, clip, def)
+}
+
+// Applies a pre-resolved clip without looking up the character clip map.
+// Use when callers already hold Clip_Def (e.g. thrashing between known clips).
+set_sprite_clip_def :: proc(sprite: ^Sprite, clip: string, def: Clip_Def) {
+	if sprite == nil do return
+	if len(def.frames) == 0 do return
+
+	if sprite.clip == clip && sprite.has_clip do return
+
 	sprite.clip = clip
 	sprite.clip_def = def
 	sprite.has_clip = true

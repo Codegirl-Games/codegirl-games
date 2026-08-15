@@ -145,6 +145,37 @@ set_sprite_clip_caches_clip_def :: proc(t: ^testing.T) {
 }
 
 @(test)
+set_sprite_clip_def_applies_and_guards :: proc(t: ^testing.T) {
+	data := make_test_character()
+	defer destroy_test_character(&data)
+
+	sprite := spawn_sprite(&data, {}, "idle", 0)
+	sprite.frame = 2
+	sprite.time = 0.05
+
+	once := data.def.clips["once"]
+	set_sprite_clip_def(&sprite, "once", once)
+	testing.expect_value(t, sprite.clip, "once")
+	testing.expect(t, sprite.has_clip, "def apply should mark clip present")
+	testing.expect_value(t, sprite.frame, 0)
+	testing.expect_value(t, sprite.time, f32(0))
+	testing.expect(t, !sprite.clip_def.loop, "once clip does not loop")
+	testing.expect_value(t, len(sprite.clip_def.frames), 3)
+
+	sprite.frame = 1
+	sprite.time = 0.09
+	set_sprite_clip_def(&sprite, "once", once)
+	testing.expect_value(t, sprite.frame, 1)
+	testing.expect_value(t, sprite.time, f32(0.09))
+
+	set_sprite_clip_def(&sprite, "empty", Clip_Def{loop = true, fps = 10, frames = nil})
+	testing.expect_value(t, sprite.clip, "once")
+	testing.expect_value(t, sprite.frame, 1)
+
+	set_sprite_clip_def(nil, "once", once)
+}
+
+@(test)
 spawn_sprite_valid_and_invalid :: proc(t: ^testing.T) {
 	data := make_test_character()
 	defer destroy_test_character(&data)
