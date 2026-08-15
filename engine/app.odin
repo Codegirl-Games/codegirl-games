@@ -504,19 +504,78 @@ group_texture_runs :: proc(list: []Queued_Sprite) {
 			end += 1
 		}
 
-		// Stable insertion sort is sufficient while MAX_SPRITES is 128.
-		for i in start + 1 ..< end {
-			item := list[i]
-			j := i
-			for j > start {
-				if uintptr(list[j - 1].texture) <= uintptr(item.texture) {
-					break
-				}
-				list[j] = list[j - 1]
-				j -= 1
-			}
-			list[j] = item
-		}
+		stable_group_by_texture(list[start:end])
 		start = end
 	}
+}
+
+// Stably orders window by texture pointer. Fast path for 1–2 textures
+// (common); insertion sort for 3+.
+stable_group_by_texture :: proc(window: []Queued_Sprite) {
+	n := len(window)
+	if n <= 1 do return
+
+	already := true
+	for i in 1 ..< n {
+		if uintptr(window[i].texture) < uintptr(window[i - 1].texture) {
+			already = false
+			break
+		}
+	}
+	if already do return
+
+	first := uintptr(window[0].texture)
+	second: uintptr
+	has_second := false
+	third := false
+	for i in 1 ..< n {
+		t := uintptr(window[i].texture)
+		if t == first do continue
+		if !has_second {
+			second = t
+			has_second = true
+			continue
+		}
+		if t != second {
+			third = true
+			break
+		}
+	}
+
+	if !has_second do return
+
+	if third {
+		for i in 1 ..< n {
+			item := window[i]
+			j := i
+			for j > 0 {
+				if uintptr(window[j - 1].texture) <= uintptr(item.texture) {
+					break
+				}
+				window[j] = window[j - 1]
+				j -= 1
+			}
+			window[j] = item
+		}
+		return
+	}
+
+	lo, hi := first, second
+	if lo > hi do lo, hi = hi, lo
+
+	tmp: [MAX_SPRITES]Queued_Sprite
+	w := 0
+	for q in window {
+		if uintptr(q.texture) == lo {
+			tmp[w] = q
+			w += 1
+		}
+	}
+	for q in window {
+		if uintptr(q.texture) == hi {
+			tmp[w] = q
+			w += 1
+		}
+	}
+	copy(window, tmp[:w])
 }
