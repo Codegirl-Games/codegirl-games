@@ -326,6 +326,24 @@ draw_sprite_stamps_batch_group_zero :: proc(t: ^testing.T) {
 }
 
 @(test)
+draw_sprite_at_max_sprites_does_not_append :: proc(t: ^testing.T) {
+	app := make_test_draw_app()
+	defer destroy_test_draw_app(&app)
+	data := make_test_draw_character()
+	defer destroy_test_draw_character(&data)
+
+	for _ in 0 ..< MAX_SPRITES {
+		append(&app.draw_list, Queued_Sprite{texture = data.texture})
+	}
+	testing.expect_value(t, len(app.draw_list), MAX_SPRITES)
+
+	sprite := spawn_sprite(&data, {100, 200}, "idle", 0)
+	draw_sprite(&app, &sprite)
+
+	testing.expect_value(t, len(app.draw_list), MAX_SPRITES)
+}
+
+@(test)
 draw_sprite_batched_stamps_batch_group :: proc(t: ^testing.T) {
 	app := make_test_draw_app()
 	defer destroy_test_draw_app(&app)
