@@ -5,12 +5,14 @@ import sdl "vendor:sdl3"
 Vec2 :: [2]f32
 
 Sprite :: struct {
-	data:     ^Character_Data,
-	position: Vec2,
-	clip:     string,
-	frame:    int,
-	time:     f32,
-	flip_x:   bool,
+	data:      ^Character_Data,
+	position:  Vec2,
+	clip:      string,
+	clip_def:  Clip_Def, // shallow cache; frames alias Character_Data (do not mutate clips map after spawn)
+	has_clip:  bool,
+	frame:     int,
+	time:      f32,
+	flip_x:    bool,
 }
 
 spawn_sprite :: proc(
@@ -24,16 +26,14 @@ spawn_sprite :: proc(
 		position = position,
 	}
 	set_sprite_clip(&sprite, clip)
-	if frame != 0 {
-		c, ok := character_clip(sprite.data, sprite.clip)
-		if ok {
-			if frame < 0 {
-				sprite.frame = 0
-			} else if frame >= len(c.frames) {
-				sprite.frame = len(c.frames) - 1
-			} else {
-				sprite.frame = frame
-			}
+	if frame != 0 && sprite.has_clip {
+		c := sprite.clip_def
+		if frame < 0 {
+			sprite.frame = 0
+		} else if frame >= len(c.frames) {
+			sprite.frame = len(c.frames) - 1
+		} else {
+			sprite.frame = frame
 		}
 	}
 	return sprite
@@ -42,9 +42,9 @@ spawn_sprite :: proc(
 update_sprite :: proc(sprite: ^Sprite, dt: f32) {
 	if sprite == nil || sprite.data == nil do return
 	if dt <= 0 do return
+	if !sprite.has_clip do return
 
-	clip, ok := character_clip(sprite.data, sprite.clip)
-	if !ok do return
+	clip := sprite.clip_def
 
 	frame_count := len(clip.frames)
 	if frame_count <= 0 do return
@@ -92,11 +92,12 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 	if len(app.draw_list) >= MAX_SPRITES {
 		return
 	}
-
-	frame, ok := character_frame(sprite.data, sprite.clip, sprite.frame)
-	if !ok {
+	if !sprite.has_clip do return
+	if sprite.frame < 0 || sprite.frame >= len(sprite.clip_def.frames) {
 		return
 	}
+
+	frame := sprite.clip_def.frames[sprite.frame]
 
 	src_w := f32(frame.source_size[0])
 	src_h := f32(frame.source_size[1])
@@ -148,12 +149,14 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 set_sprite_clip :: proc(sprite: ^Sprite, clip: string) {
 	if sprite == nil || sprite.data == nil do return
 
-	if sprite.clip == clip do return
+	if sprite.clip == clip && sprite.has_clip do return
 
-	_, ok := character_clip(sprite.data, clip)
+	def, ok := character_clip(sprite.data, clip)
 	if !ok do return
 
 	sprite.clip = clip
+	sprite.clip_def = def
+	sprite.has_clip = true
 	sprite.frame = 0
 	sprite.time = 0
 }
