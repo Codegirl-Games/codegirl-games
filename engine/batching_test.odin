@@ -191,6 +191,51 @@ group_texture_runs_already_optimal :: proc(t: ^testing.T) {
 }
 
 @(test)
+group_texture_runs_alternating_many_stable :: proc(t: ^testing.T) {
+	// Characterization: large alternating group must collapse to two runs
+	// while preserving same-texture submission order (markers).
+	N :: 64
+	list := make([]Queued_Sprite, N)
+	defer delete(list)
+	for i in 0 ..< N {
+		tex: uintptr = 2 if (i % 2) == 0 else 1
+		list[i] = queued(tex, 1, f32(i + 1))
+	}
+	testing.expect_value(t, texture_run_count(list), N)
+	group_texture_runs(list)
+	testing.expect_value(t, texture_run_count(list), 2)
+	testing.expect(t, list[0].texture == fake_tex(1))
+	testing.expect(t, list[N / 2 - 1].texture == fake_tex(1))
+	testing.expect(t, list[N / 2].texture == fake_tex(2))
+	testing.expect(t, list[N - 1].texture == fake_tex(2))
+	for i in 0 ..< N / 2 {
+		testing.expect_value(t, marker_of(list[i]), f32(2 * i + 2)) // odd markers: 2,4,...,N
+		testing.expect_value(t, marker_of(list[N / 2 + i]), f32(2 * i + 1)) // even markers: 1,3,...,N-1
+	}
+}
+
+@(test)
+group_texture_runs_three_textures_stable :: proc(t: ^testing.T) {
+	list := []Queued_Sprite {
+		queued(3, 1, 1),
+		queued(1, 1, 2),
+		queued(2, 1, 3),
+		queued(3, 1, 4),
+		queued(1, 1, 5),
+		queued(2, 1, 6),
+	}
+	testing.expect_value(t, texture_run_count(list), 6)
+	group_texture_runs(list)
+	testing.expect_value(t, texture_run_count(list), 3)
+	testing.expect_value(t, marker_of(list[0]), f32(2))
+	testing.expect_value(t, marker_of(list[1]), f32(5))
+	testing.expect_value(t, marker_of(list[2]), f32(3))
+	testing.expect_value(t, marker_of(list[3]), f32(6))
+	testing.expect_value(t, marker_of(list[4]), f32(1))
+	testing.expect_value(t, marker_of(list[5]), f32(4))
+}
+
+@(test)
 group_texture_runs_noncontiguous_same_group_id :: proc(t: ^testing.T) {
 	// Same nonzero id split by group 0: each window regroups alone.
 	list := []Queued_Sprite {
