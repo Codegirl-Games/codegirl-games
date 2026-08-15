@@ -28,6 +28,15 @@ choose_shader_runtime_prefers_msl :: proc(t: ^testing.T) {
 }
 
 @(test)
+choose_shader_runtime_prefers_dxil_without_msl :: proc(t: ^testing.T) {
+	rt, ok := choose_shader_runtime_from_formats({.DXIL, .SPIRV})
+	testing.expect(t, ok, "should pick a runtime when DXIL is available")
+	testing.expect_value(t, rt.backend, Shader_Backend.DSD12_DXIL)
+	testing.expect_value(t, rt.shader_dir, "shaders/d3d12")
+	testing.expect_value(t, rt.format, sdl.GPUShaderFormat{.DXIL})
+}
+
+@(test)
 choose_shader_runtime_spirv_only :: proc(t: ^testing.T) {
 	rt, ok := choose_shader_runtime_from_formats({.SPIRV})
 	testing.expect(t, ok, "should pick SPIR-V when it is the only format")

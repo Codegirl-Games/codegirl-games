@@ -5,12 +5,14 @@ import sdl "vendor:sdl3"
 Vec2 :: [2]f32
 
 Sprite :: struct {
-	data:     ^Character_Data,
-	position: Vec2,
-	clip:     string,
-	frame:    int,
-	time:     f32,
-	flip_x:   bool,
+	data:      ^Character_Data,
+	position:  Vec2,
+	clip:      string,
+	clip_def:  Clip_Def,
+	has_clip:  bool,
+	frame:     int,
+	time:      f32,
+	flip_x:    bool,
 }
 
 spawn_sprite :: proc(
@@ -24,16 +26,14 @@ spawn_sprite :: proc(
 		position = position,
 	}
 	set_sprite_clip(&sprite, clip)
-	if frame != 0 {
-		c, ok := character_clip(sprite.data, sprite.clip)
-		if ok {
-			if frame < 0 {
-				sprite.frame = 0
-			} else if frame >= len(c.frames) {
-				sprite.frame = len(c.frames) - 1
-			} else {
-				sprite.frame = frame
-			}
+	if frame != 0 && sprite.has_clip {
+		c := sprite.clip_def
+		if frame < 0 {
+			sprite.frame = 0
+		} else if frame >= len(c.frames) {
+			sprite.frame = len(c.frames) - 1
+		} else {
+			sprite.frame = frame
 		}
 	}
 	return sprite
@@ -42,9 +42,9 @@ spawn_sprite :: proc(
 update_sprite :: proc(sprite: ^Sprite, dt: f32) {
 	if sprite == nil || sprite.data == nil do return
 	if dt <= 0 do return
+	if !sprite.has_clip do return
 
-	clip, ok := character_clip(sprite.data, sprite.clip)
-	if !ok do return
+	clip := sprite.clip_def
 
 	frame_count := len(clip.frames)
 	if frame_count <= 0 do return
@@ -82,7 +82,31 @@ to_clip :: proc(px, py, sw, sh: f32) -> [2]f32 {
 	}
 }
 
+// Axis-aligned quad: two unique x and y values, so scale once and reuse.
+sprite_quad_to_clip :: proc(x0, y0, x1, y1, sw, sh: f32) -> [4]Vec2 {
+	sx := 2.0 / sw
+	sy := 2.0 / sh
+
+	left := x0 * sx - 1
+	right := x1 * sx - 1
+	top := 1 - y0 * sy
+	bottom := 1 - y1 * sy
+
+	return {
+		{left, top},
+		{right, top},
+		{right, bottom},
+		{left, bottom},
+	}
+}
+
 draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
+	draw_sprite_batched(app, sprite, 0)
+}
+
+// Nonzero batch_group lets end_frame regroup consecutive same-group sprites by
+// texture. Group 0 keeps exact submission order for correct alpha overlap.
+draw_sprite_batched :: proc(app: ^App, sprite: ^Sprite, batch_group: u32) {
 	if app.cmd == nil || app.swapchain_texture == nil {
 		return
 	}
@@ -92,11 +116,12 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 	if len(app.draw_list) >= MAX_SPRITES {
 		return
 	}
-
-	frame, ok := character_frame(sprite.data, sprite.clip, sprite.frame)
-	if !ok {
+	if !sprite.has_clip do return
+	if sprite.frame < 0 || sprite.frame >= len(sprite.clip_def.frames) {
 		return
 	}
+
+	frame := sprite.clip_def.frames[sprite.frame]
 
 	src_w := f32(frame.source_size[0])
 	src_h := f32(frame.source_size[1])
@@ -124,10 +149,8 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 
 	sw := f32(app.swapchain_w)
 	sh := f32(app.swapchain_h)
-	p0 := to_clip(x0_px, y0_px, sw, sh)
-	p1 := to_clip(x1_px, y0_px, sw, sh)
-	p2 := to_clip(x1_px, y1_px, sw, sh)
-	p3 := to_clip(x0_px, y1_px, sw, sh)
+	points := sprite_quad_to_clip(x0_px, y0_px, x1_px, y1_px, sw, sh)
+	p0, p1, p2, p3 := points[0], points[1], points[2], points[3]
 
 	tex_w := f32(sprite.data.width)
 	tex_h := f32(sprite.data.height)
@@ -142,18 +165,27 @@ draw_sprite :: proc(app: ^App, sprite: ^Sprite) {
 		{pos = p3, uv = {u0, v1}},
 	}
 
-	append(&app.draw_list, Queued_Sprite{texture = sprite.data.texture, verts = verts})
+	append(
+		&app.draw_list,
+		Queued_Sprite {
+			texture = sprite.data.texture,
+			verts = verts,
+			batch_group = batch_group,
+		},
+	)
 }
 
 set_sprite_clip :: proc(sprite: ^Sprite, clip: string) {
 	if sprite == nil || sprite.data == nil do return
 
-	if sprite.clip == clip do return
+	if sprite.clip == clip && sprite.has_clip do return
 
-	_, ok := character_clip(sprite.data, clip)
+	def, ok := character_clip(sprite.data, clip)
 	if !ok do return
 
 	sprite.clip = clip
+	sprite.clip_def = def
+	sprite.has_clip = true
 	sprite.frame = 0
 	sprite.time = 0
 }
