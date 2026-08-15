@@ -1,7 +1,7 @@
-.PHONY: shaders-vulkan shaders-d3d12 shaders-metal shaders-all bake toad hello_sprite crowd camera_sandbox clips check test help
+.PHONY: shaders-vulkan shaders-d3d12 shaders-metal shaders-all bake toad hello_sprite crowd crowd_batch crowd_overdraw clip_thrash camera_sandbox clips check test help
 .PHONY: flame flame-build flame-record flame-svg flame-report flame-tools
 
-# Flamegraph profiling (needs: pacman -S perf). Example: make flame  or  make flame FLAME_EXAMPLE=toad
+# Flamegraph profiling (needs: pacman -S perf). Example: make flame  or  make flame FLAME_EXAMPLE=crowd_batch
 FLAME_EXAMPLE ?= crowd
 FLAME_BIN := $(FLAME_EXAMPLE)_perf
 FLAMEGRAPH_DIR ?= tools/FlameGraph
@@ -24,6 +24,9 @@ help:
 	@echo "  toad             Run the toad example (full demo)"
 	@echo "  hello_sprite     Minimal load + draw"
 	@echo "  crowd            Many sprites, one Character_Data"
+	@echo "  crowd_batch      Multi-texture batching stress (two toad loads)"
+	@echo "  crowd_overdraw   Stacked sprites overdraw stress"
+	@echo "  clip_thrash      Per-frame idle/walk clip flip stress"
 	@echo "  camera_sandbox   Pan camera / Space toggles follow"
 	@echo "  clips            Keys 1/2 switch idle/walk"
 	@echo "  flame            Build+record+SVG+JPG+text report (FLAME_EXAMPLE=$(FLAME_EXAMPLE))"
@@ -54,6 +57,9 @@ check:
 	odin check examples/toad -collection:pkg=.
 	odin check examples/hello_sprite -collection:pkg=.
 	odin check examples/crowd -collection:pkg=.
+	odin check examples/crowd_batch -collection:pkg=.
+	odin check examples/crowd_overdraw -collection:pkg=.
+	odin check examples/clip_thrash -collection:pkg=.
 	odin check examples/camera_sandbox -collection:pkg=.
 	odin check examples/clips -collection:pkg=.
 
@@ -65,6 +71,15 @@ hello_sprite:
 
 crowd:
 	odin run examples/crowd -collection:pkg=.
+
+crowd_batch:
+	odin run examples/crowd_batch -collection:pkg=.
+
+crowd_overdraw:
+	odin run examples/crowd_overdraw -collection:pkg=.
+
+clip_thrash:
+	odin run examples/clip_thrash -collection:pkg=.
 
 camera_sandbox:
 	odin run examples/camera_sandbox -collection:pkg=.
