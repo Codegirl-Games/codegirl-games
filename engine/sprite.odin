@@ -8,7 +8,7 @@ Sprite :: struct {
 	data:      ^Character_Data,
 	position:  Vec2,
 	clip:      string,
-	clip_def:  Clip_Def, // shallow cache; frames alias Character_Data (do not mutate clips map after spawn)
+	clip_def:  Clip_Def,
 	has_clip:  bool,
 	frame:     int,
 	time:      f32,

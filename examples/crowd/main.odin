@@ -3,7 +3,7 @@ package main
 import "core:fmt"
 import eng "pkg:engine"
 
-// Stress the draw budget: one Character_Data, MAX_SPRITES instances.
+// Many sprites sharing one Character_Data (Flyweight) — good batching demo.
 COUNT :: eng.MAX_SPRITES
 COLS :: 16
 FRAME_LOG_EVERY :: 60
