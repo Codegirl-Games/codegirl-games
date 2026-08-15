@@ -16,8 +16,15 @@ SPRITE_VERTS_SIZE :: SPRITE_VERT_COUNT * size_of(Vertex)
 VERTEX_BUFFER_SIZE :: MAX_SPRITES * SPRITE_VERTS_SIZE
 
 Queued_Sprite :: struct {
+	texture:     ^sdl.GPUTexture,
+	verts:       [SPRITE_VERT_COUNT]Vertex,
+	batch_group: u32, // 0 = strict order; nonzero = caller permits regrouping
+}
+
+Draw_Batch :: struct {
+	start:   int,
+	count:   int,
 	texture: ^sdl.GPUTexture,
-	verts:   [SPRITE_VERT_COUNT]Vertex,
 }
 
 App :: struct {
@@ -65,7 +72,7 @@ init :: proc(app: ^App, title: cstring, width, height: i32) -> bool {
 	}
 
 	requested: sdl.GPUShaderFormat = {.SPIRV, .DXIL, .MSL}
-	app.device = sdl.CreateGPUDevice(requested, true, nil)
+	app.device = sdl.CreateGPUDevice(requested, false, nil)
 	if app.device == nil {
 		fmt.eprintfln("CreateGPUDevice failed: %s", sdl.GetError())
 		return false
@@ -74,6 +81,10 @@ init :: proc(app: ^App, title: cstring, width, height: i32) -> bool {
 	if !sdl.ClaimWindowForGPUDevice(app.device, app.window) {
 		fmt.eprintfln("ClaimWindowForGPUDevice failed: %s", sdl.GetError())
 		return false
+	}
+
+	if !sdl.SetGPUAllowedFramesInFlight(app.device, 3) {
+		fmt.eprintfln("SetGPUAllowedFramesInFlight failed: %s", sdl.GetError())
 	}
 
 	// Prefer uncapped present for profiling; fall back if unsupported.
@@ -242,7 +253,11 @@ end_frame :: proc(app: ^App) {
 	}
 
 	n := len(app.draw_list)
+	batches: [dynamic]Draw_Batch
+	defer delete(batches)
 	if n > 0 {
+		prepare_draw_batches(app.draw_list[:], &batches)
+
 		map_ptr := sdl.MapGPUTransferBuffer(app.device, app.transfer_buffer, false)
 		if map_ptr == nil {
 			fmt.eprintfln("MapGPUTransferBuffer failed: %s", sdl.GetError())
@@ -286,26 +301,20 @@ end_frame :: proc(app: ^App) {
 	app.render_pass = sdl.BeginGPURenderPass(cmd, &color_info, 1, nil)
 	sdl.BindGPUGraphicsPipeline(app.render_pass, app.pipeline)
 
-	i := 0
-	for i < n {
-		run := texture_run_len(app.draw_list[:], i)
-		q0 := app.draw_list[i]
-
+	for batch in batches {
 		sampler_binding := sdl.GPUTextureSamplerBinding {
-			texture = q0.texture,
+			texture = batch.texture,
 			sampler = app.sampler,
 		}
 		sdl.BindGPUFragmentSamplers(app.render_pass, 0, &sampler_binding, 1)
 
 		vb_binding := sdl.GPUBufferBinding {
 			buffer = app.vertex_buffer,
-			offset = u32(i * SPRITE_VERTS_SIZE),
+			offset = u32(batch.start * SPRITE_VERTS_SIZE),
 		}
 		sdl.BindGPUVertexBuffers(app.render_pass, 0, &vb_binding, 1)
 
-		sdl.DrawGPUPrimitives(app.render_pass, u32(run * SPRITE_VERT_COUNT), 1, 0, 0)
-
-		i += run
+		sdl.DrawGPUPrimitives(app.render_pass, u32(batch.count * SPRITE_VERT_COUNT), 1, 0, 0)
 	}
 	sdl.EndGPURenderPass(app.render_pass)
 	app.render_pass = nil
@@ -453,4 +462,61 @@ texture_run_len :: proc(list: []Queued_Sprite, start: int) -> int {
 	}
 
 	return n
+}
+
+texture_run_count :: proc(list: []Queued_Sprite) -> int {
+	if len(list) == 0 do return 0
+	count := 0
+	i := 0
+	for i < len(list) {
+		run := texture_run_len(list, i)
+		count += 1
+		i += run
+	}
+	return count
+}
+
+prepare_draw_batches :: proc(list: []Queued_Sprite, batches: ^[dynamic]Draw_Batch) {
+	clear(batches)
+	group_texture_runs(list)
+	i := 0
+	for i < len(list) {
+		run := texture_run_len(list, i)
+		append(batches, Draw_Batch{start = i, count = run, texture = list[i].texture})
+		i += run
+	}
+}
+
+// Within each contiguous nonzero batch_group, stably sort by texture so
+// consecutive same-texture sprites become one draw. Group 0 and group
+// boundaries are never crossed.
+group_texture_runs :: proc(list: []Queued_Sprite) {
+	start := 0
+	for start < len(list) {
+		group := list[start].batch_group
+		if group == 0 {
+			start += 1
+			continue
+		}
+
+		end := start + 1
+		for end < len(list) && list[end].batch_group == group {
+			end += 1
+		}
+
+		// Stable insertion sort is sufficient while MAX_SPRITES is 128.
+		for i in start + 1 ..< end {
+			item := list[i]
+			j := i
+			for j > start {
+				if uintptr(list[j - 1].texture) <= uintptr(item.texture) {
+					break
+				}
+				list[j] = list[j - 1]
+				j -= 1
+			}
+			list[j] = item
+		}
+		start = end
+	}
 }
