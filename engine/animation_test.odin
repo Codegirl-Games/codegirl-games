@@ -119,6 +119,32 @@ set_sprite_clip_switch_and_guards :: proc(t: ^testing.T) {
 }
 
 @(test)
+set_sprite_clip_caches_clip_def :: proc(t: ^testing.T) {
+	data := make_test_character()
+	defer destroy_test_character(&data)
+
+	sprite := spawn_sprite(&data, {}, "idle", 0)
+	testing.expect(t, sprite.has_clip, "spawn should cache a valid clip")
+	testing.expect_value(t, sprite.clip, "idle")
+	testing.expect(t, sprite.clip_def.loop, "idle clip loops")
+	testing.expect_value(t, sprite.clip_def.fps, f32(10))
+	testing.expect_value(t, len(sprite.clip_def.frames), 3)
+
+	set_sprite_clip(&sprite, "once")
+	testing.expect(t, sprite.has_clip, "switch should refresh cache")
+	testing.expect_value(t, sprite.clip, "once")
+	testing.expect(t, !sprite.clip_def.loop, "once clip does not loop")
+	testing.expect_value(t, sprite.clip_def.fps, f32(10))
+	testing.expect_value(t, len(sprite.clip_def.frames), 3)
+
+	set_sprite_clip(&sprite, "nope")
+	testing.expect(t, sprite.has_clip, "bad clip must leave cache intact")
+	testing.expect_value(t, sprite.clip, "once")
+	testing.expect(t, !sprite.clip_def.loop, "cached once clip preserved")
+	testing.expect_value(t, len(sprite.clip_def.frames), 3)
+}
+
+@(test)
 spawn_sprite_valid_and_invalid :: proc(t: ^testing.T) {
 	data := make_test_character()
 	defer destroy_test_character(&data)
