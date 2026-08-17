@@ -225,12 +225,12 @@ func parseModelDecision(text string) (Decision, error) {
 		return Decision{}, errors.New("model wait must be between 0 and 5000 ms")
 	}
 	action := environment.InputAction{
-		Type:     result.Action.Type,
-		Key:      result.Action.Key,
-		X:        result.Action.X,
-		Y:        result.Action.Y,
-		Button:   result.Action.Button,
-		Duration: time.Duration(result.Action.DurationMS) * time.Millisecond,
+		Type:       result.Action.Type,
+		Key:        result.Action.Key,
+		X:          result.Action.X,
+		Y:          result.Action.Y,
+		Button:     result.Action.Button,
+		DurationMS: result.Action.DurationMS,
 	}
 	switch action.Type {
 	case environment.KeyDown, environment.KeyUp, environment.MouseMove,

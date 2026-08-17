@@ -24,12 +24,12 @@ const (
 )
 
 type InputAction struct {
-	Type     InputType     `json:"type"`
-	Key      string        `json:"key,omitempty"`
-	X        int           `json:"x,omitempty"`
-	Y        int           `json:"y,omitempty"`
-	Button   int           `json:"button,omitempty"`
-	Duration time.Duration `json:"duration,omitempty"`
+	Type       InputType `json:"type"`
+	Key        string    `json:"key,omitempty"`
+	X          int       `json:"x,omitempty"`
+	Y          int       `json:"y,omitempty"`
+	Button     int       `json:"button,omitempty"`
+	DurationMS int       `json:"duration_ms,omitempty"`
 }
 
 type LogEntry struct {

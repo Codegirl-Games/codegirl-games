@@ -157,12 +157,12 @@ func (e *Environment) SendInput(ctx context.Context, action environment.InputAct
 		if action.Key == "" {
 			return errors.New("key_down requires key")
 		}
-		args = []string{"keydown", action.Key}
+		args = []string{"keydown", x11Key(action.Key)}
 	case environment.KeyUp:
 		if action.Key == "" {
 			return errors.New("key_up requires key")
 		}
-		args = []string{"keyup", action.Key}
+		args = []string{"keyup", x11Key(action.Key)}
 	case environment.MouseMove:
 		args = []string{"mousemove", strconv.Itoa(action.X), strconv.Itoa(action.Y)}
 	case environment.MouseDown:
@@ -170,13 +170,13 @@ func (e *Environment) SendInput(ctx context.Context, action environment.InputAct
 	case environment.MouseUp:
 		args = []string{"mouseup", strconv.Itoa(action.Button)}
 	case environment.Wait:
-		if action.Duration < 0 {
+		if action.DurationMS < 0 {
 			return errors.New("wait duration cannot be negative")
 		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(action.Duration):
+		case <-time.After(time.Duration(action.DurationMS) * time.Millisecond):
 			return nil
 		}
 	default:
@@ -261,6 +261,35 @@ func (e *Environment) dockerStream(ctx context.Context, args ...string) error {
 
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
+}
+
+func x11Key(key string) string {
+	switch strings.ToUpper(key) {
+	case "LEFT":
+		return "Left"
+	case "RIGHT":
+		return "Right"
+	case "UP":
+		return "Up"
+	case "DOWN":
+		return "Down"
+	case "ENTER", "RETURN":
+		return "Return"
+	case "ESC", "ESCAPE":
+		return "Escape"
+	case "SPACE":
+		return "space"
+	case "TAB":
+		return "Tab"
+	case "BACKSPACE":
+		return "BackSpace"
+	case "DELETE":
+		return "Delete"
+	}
+	if len(key) == 1 {
+		return strings.ToLower(key)
+	}
+	return key
 }
 
 var _ environment.Environment = (*Environment)(nil)

@@ -142,7 +142,7 @@ func actionDetail(action environment.InputAction) string {
 	case environment.MouseDown, environment.MouseUp:
 		return fmt.Sprintf(" %d", action.Button)
 	case environment.Wait:
-		return " " + action.Duration.String()
+		return fmt.Sprintf(" %dms", action.DurationMS)
 	default:
 		return ""
 	}
