@@ -294,8 +294,19 @@ func (r *runner) screenshot(ctx context.Context, containerPath, hostPath string)
 	if _, err := r.docker(ctx, "exec", r.containerName, "scrot", "-o", containerPath); err != nil {
 		return fmt.Errorf("capture screenshot: %w", err)
 	}
-	if _, err := r.docker(ctx, "cp", r.containerName+":"+containerPath, hostPath); err != nil {
-		return fmt.Errorf("copy screenshot: %w", err)
+	if err := r.extract(ctx, containerPath, hostPath); err != nil {
+		return fmt.Errorf("extract screenshot: %w", err)
+	}
+	return nil
+}
+
+func (r *runner) extract(ctx context.Context, containerPath, hostPath string) error {
+	data, err := r.docker(ctx, "exec", r.containerName, "cat", containerPath)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(hostPath, data, 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", hostPath, err)
 	}
 	return nil
 }
@@ -354,10 +365,10 @@ func (r *runner) cleanup() error {
 	fmt.Println("Stopping environment...")
 	stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_, stopErr := r.docker(stopCtx, "stop", "--time=3", r.containerName)
 	for _, name := range []string{"stdout.log", "stderr.log"} {
-		_, _ = r.docker(stopCtx, "cp", r.containerName+":/tmp/"+name, filepath.Join(r.runDir, name))
+		_ = r.extract(stopCtx, "/tmp/"+name, filepath.Join(r.runDir, name))
 	}
+	_, stopErr := r.docker(stopCtx, "stop", "--time=3", r.containerName)
 	_, removeErr := r.docker(stopCtx, "rm", "-f", r.containerName)
 	if stopErr != nil {
 		return fmt.Errorf("stop environment: %w", stopErr)
