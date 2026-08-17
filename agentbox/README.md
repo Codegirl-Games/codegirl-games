@@ -1,13 +1,16 @@
-# Agentbox Phase 1
+# Agentbox
 
 This is a local technical spike for a programmable graphical Linux
 environment. It proves that a controller can launch an ordinary GUI process
-headlessly, observe pixels, inject keyboard and mouse input, and shut the
+headlessly, observe pixels and logs, inject keyboard and mouse input, drive the
+application through a replaceable agent, record a trace, and shut the
 environment down.
 
-Phase 1 does not contain an LLM, model provider, cloud control plane, or
-production sandbox. See [the architecture decision](docs/architecture.md) for
-the choices and security boundary.
+The default agent is deterministic and requires no API credentials. One
+optional OpenAI Responses adapter demonstrates screenshot + text model control.
+This is still a local spike, not a cloud control plane or production sandbox.
+See [the architecture decision](docs/architecture.md) for the choices and
+security boundary.
 
 ## Requirements
 
@@ -19,41 +22,78 @@ the choices and security boundary.
 No X server, window manager, or C compiler is required on the host; those
 dependencies are built into the container image.
 
-## Run the proof
+## One-command demo
 
 From this directory:
 
 ```sh
-make phase1
+make demo
 ```
 
 That one command:
 
-1. builds the local environment image;
-2. starts a restricted container with Xvfb and Openbox;
-3. launches the mover application;
-4. captures `before.png`;
-5. moves and clicks the mouse;
-6. holds the RIGHT key for one second;
-7. captures `after.png`;
-8. locates the green square in both images and fails unless it moved at least
-   100 pixels right;
-9. stops and removes the container, including on failure or interruption.
+1. builds the `agentbox` CLI and mover executable;
+2. creates a restricted Xvfb/Openbox environment;
+3. stages and launches the executable;
+4. runs the deterministic observe/press/wait/release/observe loop;
+5. records screenshots, actions, decisions, logs, and final status;
+6. stops and removes the environment, including on failure or interruption.
 
-A passing run ends with output similar to:
+The equivalent explicit commands are:
 
-```text
-Capturing screenshot before input...
-Sending synthetic mouse input...
-Holding RIGHT for one second...
-Capturing screenshot after input...
-Verified: square moved 180.0 pixels to the right.
-Phase 1 passed. Artifacts: .../.agentbox/runs/20260817T...
-Stopping environment...
-Environment stopped cleanly.
+```sh
+make build demo-binary
+./agentbox run ./examples/mover \
+  --task "Launch the application, move the character to the right, and describe what happened."
 ```
 
-## Artifacts
+Flags can appear before or after the path.
+
+## Run a private executable
+
+Pass a prebuilt Linux executable:
+
+```sh
+./agentbox run ./path/to/application --task "Open the menu and click Settings."
+```
+
+For a directory, add `agentbox.json`:
+
+```json
+{
+  "command": "game",
+  "args": ["--windowed"],
+  "env": {"EXAMPLE": "value"},
+  "window_title": "My Game"
+}
+```
+
+The command is resolved relative to the manifest. The current runtime is
+Debian-based, so dynamically linked executables must have compatible libraries.
+
+## Model agent
+
+The model adapter is opt-in:
+
+```sh
+export OPENAI_API_KEY="..."
+./agentbox run ./path/to/application \
+  --task "Move the character right and report the result." \
+  --agent openai \
+  --model gpt-5
+```
+
+Each request contains the task, current screenshot, previous actions, step
+history, and recent application logs. Strict structured output allows one
+backend-neutral input action or completion. Use `--max-steps` to bound a run.
+The environment itself still has no network access.
+
+## Runs and inspection
+
+```sh
+./agentbox runs
+./agentbox inspect <run-id>
+```
 
 Each run writes:
 
@@ -61,17 +101,25 @@ Each run writes:
 .agentbox/runs/<run-id>/
 ├── run.json
 ├── actions.jsonl
+├── steps.jsonl
 ├── screenshots/
-│   ├── before.png
-│   └── after.png
+│   ├── 0001.png
+│   └── ...
 ├── stdout.log
 └── stderr.log
 ```
 
-`run.json` contains the measured before/after centroids, movement distance,
-container-engine version, timestamps, and pass/fail status. `actions.jsonl`
-contains the backend-neutral input actions sent during this proof. Application
-output is copied from the container before it is destroyed.
+`run.json` has `schema_version: "1"` plus task, application, agent, timestamps,
+status, and step count. `steps.jsonl` records each observation reference, agent
+message, and action. `actions.jsonl` is a compact action-only stream.
+
+## Original environment proof
+
+The visual centroid test from Phase 1 remains available:
+
+```sh
+make phase1
+```
 
 ## Development checks
 
@@ -79,6 +127,3 @@ output is copied from the container before it is destroyed.
 make test
 go vet ./...
 ```
-
-The future `agentbox run <path> --task ...` flow belongs to Phases 2 and 3.
-This branch intentionally stops after proving the environment mechanism.

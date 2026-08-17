@@ -1,6 +1,6 @@
-# Phase 1 architecture decision
+# Agentbox spike architecture decision
 
-Status: accepted for the local spike
+Status: implemented for Phases 1–4 of the local spike
 
 ## Decision
 
@@ -12,10 +12,10 @@ Run one application environment per Docker container. Inside the container:
 - `scrot` captures the complete display as PNG.
 - `xdotool` injects keyboard and mouse events through X11's XTEST extension.
 
-The Go process on the host owns the lifecycle. It builds and creates the
+The Go control plane on the host owns the lifecycle. It builds and creates the
 container, starts the display, launches the application as a separate step,
 captures images, sends input, copies artifacts out, and removes the container.
-The first spike intentionally uses the Docker CLI as its narrow adapter rather
+The spike intentionally uses the Docker CLI as its narrow adapter rather
 than adding a Docker SDK dependency.
 
 ```text
@@ -79,23 +79,48 @@ source or package dependency without changing the tested path. The runtime is
 not coupled to Xlib: any executable in a future staged image can use SDL,
 Raylib, Qt, GTK, a browser, or another X11-compatible toolkit.
 
-## Separation preserved for later phases
+## Runtime separation
 
-Phase 1 contains concrete orchestration, but its data flow already keeps these
-roles distinct:
+The implemented data flow keeps these roles distinct:
 
 ```text
-CLI -> lifecycle controller -> container environment -> application
-                                      |
-                                observation/input
-                                      |
-                              deterministic driver
+CLI -> runtime controller -> Environment -> application
+               |                |
+               |         observation/input/logs
+               |
+             Agent
+               |
+       deterministic or OpenAI
+               |
+          versioned trace
 ```
 
-Phase 2 should extract lifecycle, screenshot, input, and logs into an
-`Environment` interface with backend-neutral actions. Phase 3 should consume
-that interface through an `Agent`; neither a deterministic agent nor a model
-adapter should import Docker or X11 details.
+`internal/environment` defines lifecycle, screenshot, input, and log contracts
+with backend-neutral actions. `internal/environment/dockerx11` is the only
+package that knows about Docker, X11, `scrot`, or `xdotool`.
+
+`internal/agent` defines observations, history, and decisions. The deterministic
+agent and optional OpenAI Responses adapter both implement that interface; they
+do not import the Docker backend. The model adapter receives the task, current
+PNG, action history, and recent logs, then returns one schema-constrained
+action. It is intentionally one concrete adapter, not a provider framework.
+
+`internal/runtime` connects those interfaces and contains no provider or X11
+logic. `internal/trace` records versioned metadata plus append-only step and
+action streams. Screenshots remain separate PNG files referenced by relative
+path, which keeps traces readable and suitable for later replay or comparison.
+
+## Application staging
+
+`agentbox run` accepts one prebuilt Linux executable. A directory can contain
+an `agentbox.json` manifest naming that executable, arguments, environment
+variables, and an optional window title. The Docker backend streams the file
+into the environment's tmpfs and makes it executable; no host directory is
+mounted into the container.
+
+The executable and its libraries must be compatible with the Debian-based
+runtime image. Packaging arbitrary dependency trees is a separate upload/build
+format problem and is not hidden by this spike.
 
 ## Security boundary
 
