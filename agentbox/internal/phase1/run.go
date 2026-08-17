@@ -155,7 +155,7 @@ func Run(ctx context.Context) (runErr error) {
 	var windowID string
 	if err := r.waitFor(ctx, 10*time.Second, func() bool {
 		output, searchErr := r.docker(ctx, "exec", r.containerName, "xdotool",
-			"search", "--onlyvisible", "--name", "Agentbox Mover")
+			"search", "--name", "Agentbox Mover")
 		if searchErr != nil {
 			return false
 		}
