@@ -57,7 +57,7 @@ func (e *Environment) Start(ctx context.Context) error {
 		"--init",
 		"--network=none",
 		"--read-only",
-		"--tmpfs=/tmp:rw,nosuid,nodev,size=128m",
+		"--tmpfs=/tmp:rw,exec,nosuid,nodev,size=128m",
 		"--cap-drop=ALL",
 		"--security-opt=no-new-privileges",
 		"--pids-limit=128",
