@@ -8,10 +8,10 @@ import (
 // Command describes a host executable and how it should start in an
 // environment. Environment implementations decide how to stage the file.
 type Command struct {
-	Path        string
-	Args        []string
-	Env         map[string]string
-	WindowTitle string
+	Path                 string
+	Args                 []string
+	EnvironmentVariables map[string]string
+	WindowTitle          string
 }
 
 // InputType identifies one backend-neutral keyboard, mouse, or timing action.
@@ -36,7 +36,8 @@ type InputAction struct {
 	DurationMS int       `json:"duration_ms,omitempty"`
 }
 
-// LogEntry is a snapshot of one application output stream.
+// LogEntry is a cumulative snapshot of one application output stream. Time is
+// when Agentbox captured the snapshot, not when the application emitted it.
 type LogEntry struct {
 	Stream  string    `json:"stream"`
 	Message string    `json:"message"`

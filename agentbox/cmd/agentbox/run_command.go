@@ -67,7 +67,7 @@ func run(ctx context.Context, args []string) error {
 		fmt.Fprintf(os.Stderr, "Run artifacts: %s\n", traceStore.Directory())
 		return err
 	}
-	fmt.Printf("Replay written to:\n%s\n", traceStore.Directory())
+	fmt.Printf("Run artifacts written to:\n%s\n", traceStore.Directory())
 	return nil
 }
 

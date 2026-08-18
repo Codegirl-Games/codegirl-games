@@ -76,6 +76,8 @@ func greenCentroidX(screenshot []byte) (float64, error) {
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			red, green, blue, _ := renderedImage.At(x, y).RGBA()
+			// Match the mover's #00ff66 square. Requiring 1,000 matching pixels
+			// prevents a small green UI detail from passing verification.
 			if green > 0xc000 && red < 0x4000 && blue < 0x8000 {
 				xCoordinateSum += uint64(x)
 				greenPixelCount++

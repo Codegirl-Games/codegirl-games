@@ -17,7 +17,7 @@ func (environmentBackend *Environment) Launch(
 	ctx context.Context,
 	application environment.Command,
 ) error {
-	fmt.Fprintln(environmentBackend.config.Output, "Uploading build...")
+	fmt.Fprintln(environmentBackend.config.Output, "Staging application...")
 	executable, err := os.Open(application.Path)
 	if err != nil {
 		return fmt.Errorf("open application: %w", err)
@@ -47,7 +47,7 @@ func (environmentBackend *Environment) Launch(
 
 	fmt.Fprintln(environmentBackend.config.Output, "Launching application...")
 	dockerArguments := []string{"exec", "-d"}
-	for variableName, variableValue := range application.Env {
+	for variableName, variableValue := range application.EnvironmentVariables {
 		dockerArguments = append(
 			dockerArguments,
 			"-e",

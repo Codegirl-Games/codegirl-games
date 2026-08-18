@@ -25,6 +25,8 @@ func List(projectRoot string) ([]Run, error) {
 			continue
 		}
 		run, err := Read(projectRoot, entry.Name())
+		// Old or malformed trace directories are intentionally hidden rather
+		// than making the entire run listing fail.
 		if err == nil && run.SchemaVersion == SchemaVersion {
 			runs = append(runs, run)
 		}
@@ -87,6 +89,7 @@ func ReadSteps(projectRoot, runID string) ([]StepRecord, error) {
 }
 
 func validateRunID(runID string) error {
+	// Run IDs become path components, so reject separators and traversal.
 	if filepath.Base(runID) != runID {
 		return errors.New("invalid run ID")
 	}

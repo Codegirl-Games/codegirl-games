@@ -117,7 +117,7 @@ func Run(ctx context.Context) (runErr error) {
 		return fmt.Errorf("build environment image: %w", err)
 	}
 
-	fmt.Println("Creating isolated graphical environment...")
+	fmt.Println("Creating restricted graphical environment...")
 	_, err = r.docker(ctx,
 		"create",
 		"--name", r.containerName,
@@ -327,6 +327,8 @@ func squareCentroid(path string) (point, error) {
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			red, green, blue, _ := img.At(x, y).RGBA()
+			// Match the demo square's #00ff66 color with enough tolerance for
+			// image conversion while rejecting the black background.
 			if green > 0xc000 && red < 0x4000 && blue < 0x8000 {
 				sumX += uint64(x)
 				sumY += uint64(y)

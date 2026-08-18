@@ -11,10 +11,10 @@ import (
 )
 
 type manifest struct {
-	Command     string            `json:"command"`
-	Args        []string          `json:"args"`
-	Env         map[string]string `json:"env"`
-	WindowTitle string            `json:"window_title"`
+	Command              string            `json:"command"`
+	Args                 []string          `json:"args"`
+	EnvironmentVariables map[string]string `json:"env"`
+	WindowTitle          string            `json:"window_title"`
 }
 
 // Resolve turns either an executable path or a directory containing
@@ -58,9 +58,9 @@ func Resolve(path string) (environment.Command, error) {
 		return environment.Command{}, errors.New("manifest command must be a regular executable file")
 	}
 	return environment.Command{
-		Path:        commandPath,
-		Args:        config.Args,
-		Env:         config.Env,
-		WindowTitle: config.WindowTitle,
+		Path:                 commandPath,
+		Args:                 config.Args,
+		EnvironmentVariables: config.EnvironmentVariables,
+		WindowTitle:          config.WindowTitle,
 	}, nil
 }

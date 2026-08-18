@@ -69,6 +69,8 @@ func (environmentBackend *Environment) Start(ctx context.Context) error {
 	); err != nil {
 		return fmt.Errorf("start environment: %w", err)
 	}
+	// entrypoint.sh creates this file only after both Xvfb and Openbox accept
+	// requests. It is the readiness handshake between host and container.
 	if err := waitFor(ctx, 10*time.Second, func() bool {
 		_, readyErr := environmentBackend.runDocker(
 			ctx,

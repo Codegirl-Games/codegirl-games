@@ -45,7 +45,7 @@ func Run(ctx context.Context, config Config) (runErr error) {
 	if err := config.Environment.Launch(ctx, config.Command); err != nil {
 		return err
 	}
-	fmt.Fprintln(config.Output, "Agent attached.")
+	fmt.Fprintln(config.Output, "Agent loop started.")
 
 	var stepHistory []agent.Step
 	var actionHistory []environment.InputAction

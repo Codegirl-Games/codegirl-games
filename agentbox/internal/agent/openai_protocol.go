@@ -87,12 +87,14 @@ func modelPrompt(task string, history []Step, observation Observation) (string, 
 		return "", err
 	}
 	return "You control an interactive Linux application from screenshots. " +
-		"Choose exactly one safe input action, or mark done when the task is complete. " +
+		"Choose exactly one allowed input action, or mark done when the task is complete. " +
 		"Use logical key names such as RIGHT, ENTER, or ESCAPE. Keep waits under 5000 ms.\n" +
 		string(data), nil
 }
 
 func decisionSchema() map[string]any {
+	// Strict structured output requires every action property to be present,
+	// even when a particular action ignores most of them.
 	actionProperties := map[string]any{
 		"type": map[string]any{
 			"type": "string",
