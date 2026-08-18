@@ -9,7 +9,9 @@ func TestParseRunOptionsAllowsFlagsAfterPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if options.path != "./game" || options.task != "move right" || options.maxSteps != 7 {
+	if options.applicationPath != "./game" ||
+		options.task != "move right" ||
+		options.maxSteps != 7 {
 		t.Fatalf("options = %#v", options)
 	}
 }

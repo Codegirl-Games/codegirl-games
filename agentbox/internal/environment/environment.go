@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// Command describes a host executable and how it should start in an
+// environment. Environment implementations decide how to stage the file.
 type Command struct {
 	Path        string
 	Args        []string
@@ -12,6 +14,7 @@ type Command struct {
 	WindowTitle string
 }
 
+// InputType identifies one backend-neutral keyboard, mouse, or timing action.
 type InputType string
 
 const (
@@ -23,6 +26,7 @@ const (
 	Wait      InputType = "wait"
 )
 
+// InputAction contains only fields relevant to Type. DurationMS is used by Wait.
 type InputAction struct {
 	Type       InputType `json:"type"`
 	Key        string    `json:"key,omitempty"`
@@ -32,12 +36,15 @@ type InputAction struct {
 	DurationMS int       `json:"duration_ms,omitempty"`
 }
 
+// LogEntry is a snapshot of one application output stream.
 type LogEntry struct {
 	Stream  string    `json:"stream"`
 	Message string    `json:"message"`
 	Time    time.Time `json:"time"`
 }
 
+// Environment is the programmable-computer boundary used by the runtime.
+// Implementations may use containers, virtual machines, or remote hosts.
 type Environment interface {
 	Start(context.Context) error
 	Launch(context.Context, Command) error

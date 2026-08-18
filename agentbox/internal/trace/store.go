@@ -1,85 +1,52 @@
 package trace
 
 import (
-	"bufio"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"time"
 
 	"agentbox/internal/environment"
 )
 
-const SchemaVersion = "1"
-
-type Run struct {
-	SchemaVersion string    `json:"schema_version"`
-	ID            string    `json:"id"`
-	Task          string    `json:"task"`
-	Application   string    `json:"application"`
-	Agent         string    `json:"agent"`
-	Status        string    `json:"status"`
-	StartedAt     time.Time `json:"started_at"`
-	FinishedAt    time.Time `json:"finished_at,omitempty"`
-	StepCount     int       `json:"step_count"`
-	Error         string    `json:"error,omitempty"`
-}
-
-type ObservationRecord struct {
-	Screenshot      string                    `json:"screenshot"`
-	Logs            []environment.LogEntry    `json:"logs,omitempty"`
-	PreviousActions []environment.InputAction `json:"previous_actions,omitempty"`
-}
-
-type AgentRecord struct {
-	Message string `json:"message"`
-}
-
-type StepRecord struct {
-	Step        int                      `json:"step"`
-	Timestamp   time.Time                `json:"timestamp"`
-	Observation ObservationRecord        `json:"observation"`
-	Agent       AgentRecord              `json:"agent"`
-	Action      *environment.InputAction `json:"action,omitempty"`
-	Done        bool                     `json:"done,omitempty"`
-}
-
+// Store writes one run's metadata and append-only event streams.
 type Store struct {
-	root    string
-	runDir  string
-	run     Run
-	steps   *os.File
-	actions *os.File
+	runDirectory string
+	run          Run
+	stepsFile    *os.File
+	actionsFile  *os.File
 }
 
-func New(root, task, application, agentName string) (*Store, error) {
-	id, err := newID()
+func New(projectRoot, task, application, agentName string) (*Store, error) {
+	runID, err := newRunID()
 	if err != nil {
 		return nil, err
 	}
-	runDir := filepath.Join(root, ".agentbox", "runs", id)
-	if err := os.MkdirAll(filepath.Join(runDir, "screenshots"), 0o755); err != nil {
+	runDirectory := filepath.Join(projectRoot, ".agentbox", "runs", runID)
+	screenshotDirectory := filepath.Join(runDirectory, "screenshots")
+	if err := os.MkdirAll(screenshotDirectory, 0o755); err != nil {
 		return nil, fmt.Errorf("create run directory: %w", err)
 	}
-	steps, err := os.Create(filepath.Join(runDir, "steps.jsonl"))
+	stepsFile, err := os.Create(filepath.Join(runDirectory, "steps.jsonl"))
 	if err != nil {
 		return nil, fmt.Errorf("create step trace: %w", err)
 	}
-	actions, err := os.Create(filepath.Join(runDir, "actions.jsonl"))
+	actionsFile, err := os.Create(filepath.Join(runDirectory, "actions.jsonl"))
 	if err != nil {
-		_ = steps.Close()
+		_ = stepsFile.Close()
 		return nil, fmt.Errorf("create action trace: %w", err)
 	}
+
 	store := &Store{
-		root: root, runDir: runDir, steps: steps, actions: actions,
+		runDirectory: runDirectory,
+		stepsFile:    stepsFile,
+		actionsFile:  actionsFile,
 		run: Run{
 			SchemaVersion: SchemaVersion,
-			ID:            id,
+			ID:            runID,
 			Task:          task,
 			Application:   application,
 			Agent:         agentName,
@@ -87,143 +54,103 @@ func New(root, task, application, agentName string) (*Store, error) {
 			StartedAt:     time.Now().UTC(),
 		},
 	}
-	if err := store.writeRun(); err != nil {
-		_ = steps.Close()
-		_ = actions.Close()
+	if err := store.writeRunSummary(); err != nil {
+		_ = stepsFile.Close()
+		_ = actionsFile.Close()
 		return nil, err
 	}
 	return store, nil
 }
 
-func (s *Store) ID() string {
-	return s.run.ID
+func (store *Store) ID() string {
+	return store.run.ID
 }
 
-func (s *Store) Directory() string {
-	return s.runDir
+func (store *Store) Directory() string {
+	return store.runDirectory
 }
 
-func (s *Store) SaveScreenshot(step int, data []byte) (string, error) {
-	relative := filepath.Join("screenshots", fmt.Sprintf("%04d.png", step))
-	if err := os.WriteFile(filepath.Join(s.runDir, relative), data, 0o644); err != nil {
+func (store *Store) SaveScreenshot(stepNumber int, screenshot []byte) (string, error) {
+	relativePath := filepath.Join(
+		"screenshots",
+		fmt.Sprintf("%04d.png", stepNumber),
+	)
+	absolutePath := filepath.Join(store.runDirectory, relativePath)
+	if err := os.WriteFile(absolutePath, screenshot, 0o644); err != nil {
 		return "", fmt.Errorf("write screenshot: %w", err)
 	}
-	return filepath.ToSlash(relative), nil
+	// Trace paths always use slash separators so traces are portable.
+	return filepath.ToSlash(relativePath), nil
 }
 
-func (s *Store) Record(record StepRecord) error {
-	if err := appendJSON(s.steps, record); err != nil {
+func (store *Store) Record(step StepRecord) error {
+	if err := appendJSONLine(store.stepsFile, step); err != nil {
 		return fmt.Errorf("record step: %w", err)
 	}
-	if record.Action != nil {
-		action := struct {
-			Step      int                     `json:"step"`
-			Timestamp time.Time               `json:"timestamp"`
-			Action    environment.InputAction `json:"action"`
-		}{record.Step, record.Timestamp, *record.Action}
-		if err := appendJSON(s.actions, action); err != nil {
+	if step.Action != nil {
+		action := actionRecord{
+			Step:      step.Step,
+			Timestamp: step.Timestamp,
+			Action:    *step.Action,
+		}
+		if err := appendJSONLine(store.actionsFile, action); err != nil {
 			return fmt.Errorf("record action: %w", err)
 		}
 	}
-	s.run.StepCount = record.Step
-	return s.writeRun()
+	store.run.StepCount = step.Step
+	return store.writeRunSummary()
 }
 
-func (s *Store) WriteLogs(logs []environment.LogEntry) error {
-	var stdout, stderr string
-	for _, entry := range logs {
-		if entry.Stream == "stderr" {
-			stderr = entry.Message
-		} else if entry.Stream == "stdout" {
-			stdout = entry.Message
+func (store *Store) WriteLogs(logEntries []environment.LogEntry) error {
+	var standardOutput, standardError string
+	for _, entry := range logEntries {
+		switch entry.Stream {
+		case "stdout":
+			standardOutput = entry.Message
+		case "stderr":
+			standardError = entry.Message
 		}
 	}
-	if err := os.WriteFile(filepath.Join(s.runDir, "stdout.log"), []byte(stdout), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(store.runDirectory, "stdout.log"),
+		[]byte(standardOutput),
+		0o644,
+	); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(s.runDir, "stderr.log"), []byte(stderr), 0o644)
+	return os.WriteFile(
+		filepath.Join(store.runDirectory, "stderr.log"),
+		[]byte(standardError),
+		0o644,
+	)
 }
 
-func (s *Store) Finish(runErr error) error {
-	if s.steps != nil {
-		_ = s.steps.Close()
-		s.steps = nil
-	}
-	if s.actions != nil {
-		_ = s.actions.Close()
-		s.actions = nil
-	}
-	s.run.FinishedAt = time.Now().UTC()
+func (store *Store) Finish(runErr error) error {
+	store.closeEventFiles()
+	store.run.FinishedAt = time.Now().UTC()
 	if runErr != nil {
-		s.run.Status = "failed"
-		s.run.Error = runErr.Error()
+		store.run.Status = "failed"
+		store.run.Error = runErr.Error()
 	} else {
-		s.run.Status = "complete"
+		store.run.Status = "complete"
 	}
-	return s.writeRun()
+	return store.writeRunSummary()
 }
 
-func List(root string) ([]Run, error) {
-	directories, err := os.ReadDir(filepath.Join(root, ".agentbox", "runs"))
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
+func (store *Store) closeEventFiles() {
+	if store.stepsFile != nil {
+		_ = store.stepsFile.Close()
+		store.stepsFile = nil
 	}
-	if err != nil {
-		return nil, err
+	if store.actionsFile != nil {
+		_ = store.actionsFile.Close()
+		store.actionsFile = nil
 	}
-	var runs []Run
-	for _, directory := range directories {
-		if !directory.IsDir() {
-			continue
-		}
-		run, err := Read(root, directory.Name())
-		if err == nil && run.SchemaVersion == SchemaVersion {
-			runs = append(runs, run)
-		}
-	}
-	sort.Slice(runs, func(i, j int) bool {
-		return runs[i].StartedAt.After(runs[j].StartedAt)
-	})
-	return runs, nil
 }
 
-func Read(root, id string) (Run, error) {
-	if filepath.Base(id) != id {
-		return Run{}, errors.New("invalid run ID")
-	}
-	data, err := os.ReadFile(filepath.Join(root, ".agentbox", "runs", id, "run.json"))
-	if err != nil {
-		return Run{}, err
-	}
-	var run Run
-	if err := json.Unmarshal(data, &run); err != nil {
-		return Run{}, err
-	}
-	return run, nil
-}
-
-func ReadSteps(root, id string) ([]StepRecord, error) {
-	if filepath.Base(id) != id {
-		return nil, errors.New("invalid run ID")
-	}
-	file, err := os.Open(filepath.Join(root, ".agentbox", "runs", id, "steps.jsonl"))
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	var steps []StepRecord
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		var step StepRecord
-		if err := json.Unmarshal(scanner.Bytes(), &step); err != nil {
-			return nil, err
-		}
-		steps = append(steps, step)
-	}
-	return steps, scanner.Err()
-}
-
-func appendJSON(file *os.File, value any) error {
+// Sync each JSONL record so an interrupted run retains its latest complete
+// decision. Performance is secondary to debuggability in this local spike.
+func appendJSONLine(file *os.File, value any) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -234,18 +161,20 @@ func appendJSON(file *os.File, value any) error {
 	return file.Sync()
 }
 
-func (s *Store) writeRun() error {
-	data, err := json.MarshalIndent(s.run, "", "  ")
+func (store *Store) writeRunSummary() error {
+	data, err := json.MarshalIndent(store.run, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(s.runDir, "run.json"), append(data, '\n'), 0o644)
+	runPath := filepath.Join(store.runDirectory, "run.json")
+	return os.WriteFile(runPath, append(data, '\n'), 0o644)
 }
 
-func newID() (string, error) {
-	random := make([]byte, 3)
-	if _, err := rand.Read(random); err != nil {
+func newRunID() (string, error) {
+	randomSuffix := make([]byte, 3)
+	if _, err := rand.Read(randomSuffix); err != nil {
 		return "", err
 	}
-	return time.Now().UTC().Format("20060102T150405") + "-" + hex.EncodeToString(random), nil
+	timestamp := time.Now().UTC().Format("20060102T150405")
+	return timestamp + "-" + hex.EncodeToString(randomSuffix), nil
 }

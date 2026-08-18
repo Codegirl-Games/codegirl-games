@@ -17,6 +17,8 @@ type manifest struct {
 	WindowTitle string            `json:"window_title"`
 }
 
+// Resolve turns either an executable path or a directory containing
+// agentbox.json into the backend-neutral launch command.
 func Resolve(path string) (environment.Command, error) {
 	absolute, err := filepath.Abs(path)
 	if err != nil {

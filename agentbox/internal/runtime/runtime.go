@@ -12,14 +12,16 @@ import (
 	"agentbox/internal/trace"
 )
 
+// Config wires replaceable environment, agent, and trace implementations into
+// one run. The runtime itself has no Docker, X11, or model-provider knowledge.
 type Config struct {
-	Task     string
-	Command  environment.Command
-	Agent    agent.Agent
-	Env      environment.Environment
-	Trace    *trace.Store
-	MaxSteps int
-	Output   io.Writer
+	Task        string
+	Command     environment.Command
+	Controller  agent.Agent
+	Environment environment.Environment
+	TraceStore  *trace.Store
+	MaxSteps    int
+	Output      io.Writer
 }
 
 func Run(ctx context.Context, config Config) (runErr error) {
@@ -29,88 +31,85 @@ func Run(ctx context.Context, config Config) (runErr error) {
 	if config.Output == nil {
 		config.Output = io.Discard
 	}
-	if config.Agent == nil || config.Env == nil || config.Trace == nil {
+	if config.Controller == nil || config.Environment == nil || config.TraceStore == nil {
 		return errors.New("runtime requires agent, environment, and trace")
 	}
 
-	started := false
 	defer func() {
-		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if started {
-			if logs, err := config.Env.Logs(cleanupCtx); err == nil {
-				if logErr := config.Trace.WriteLogs(logs); runErr == nil && logErr != nil {
-					runErr = logErr
-				}
-			}
-			if stopErr := config.Env.Stop(cleanupCtx); runErr == nil && stopErr != nil {
-				runErr = stopErr
-			}
-		}
-		if finishErr := config.Trace.Finish(runErr); runErr == nil && finishErr != nil {
-			runErr = finishErr
-		}
+		runErr = finalizeRun(config, runErr)
 	}()
 
-	if err := config.Env.Start(ctx); err != nil {
+	if err := config.Environment.Start(ctx); err != nil {
 		return err
 	}
-	started = true
-	if err := config.Env.Launch(ctx, config.Command); err != nil {
+	if err := config.Environment.Launch(ctx, config.Command); err != nil {
 		return err
 	}
 	fmt.Fprintln(config.Output, "Agent attached.")
 
-	var history []agent.Step
-	var actions []environment.InputAction
-	startedAt := time.Now()
-	for number := 1; number <= config.MaxSteps; number++ {
-		screenshot, err := config.Env.Screenshot(ctx)
+	var stepHistory []agent.Step
+	var actionHistory []environment.InputAction
+	runStartedAt := time.Now()
+	for stepNumber := 1; stepNumber <= config.MaxSteps; stepNumber++ {
+		screenshot, err := config.Environment.Screenshot(ctx)
 		if err != nil {
 			return err
 		}
-		screenshotPath, err := config.Trace.SaveScreenshot(number, screenshot)
+		screenshotPath, err := config.TraceStore.SaveScreenshot(stepNumber, screenshot)
 		if err != nil {
 			return err
 		}
-		logs, err := config.Env.Logs(ctx)
+		applicationLogs, err := config.Environment.Logs(ctx)
 		if err != nil {
 			return err
 		}
-		now := time.Now().UTC()
-		fmt.Fprintf(config.Output, "[%s] screenshot captured\n", elapsed(startedAt))
-		decision, err := config.Agent.NextAction(ctx, config.Task, history, agent.Observation{
+		observedAt := time.Now().UTC()
+		previousActions := append([]environment.InputAction(nil), actionHistory...)
+		observation := agent.Observation{
 			Screenshot:      screenshot,
-			Timestamp:       now,
-			Logs:            logs,
-			PreviousActions: append([]environment.InputAction(nil), actions...),
-		})
+			Timestamp:       observedAt,
+			Logs:            applicationLogs,
+			PreviousActions: previousActions,
+		}
+		fmt.Fprintf(config.Output, "[%s] screenshot captured\n", elapsed(runStartedAt))
+
+		decision, err := config.Controller.NextAction(
+			ctx,
+			config.Task,
+			stepHistory,
+			observation,
+		)
 		if err != nil {
 			return fmt.Errorf("agent next action: %w", err)
 		}
-		fmt.Fprintf(config.Output, "[%s] agent: %s\n", elapsed(startedAt), decision.Reason)
-		record := trace.StepRecord{
-			Step:      number,
-			Timestamp: now,
+		fmt.Fprintf(
+			config.Output,
+			"[%s] agent: %s\n",
+			elapsed(runStartedAt),
+			decision.Reason,
+		)
+		if err := config.TraceStore.Record(trace.StepRecord{
+			Step:      stepNumber,
+			Timestamp: observedAt,
 			Observation: trace.ObservationRecord{
 				Screenshot:      screenshotPath,
-				Logs:            logs,
-				PreviousActions: append([]environment.InputAction(nil), actions...),
+				Logs:            applicationLogs,
+				PreviousActions: previousActions,
 			},
 			Agent:  trace.AgentRecord{Message: decision.Reason},
 			Action: decision.Action,
 			Done:   decision.Done,
-		}
-		if err := config.Trace.Record(record); err != nil {
+		}); err != nil {
 			return err
 		}
-		history = append(history, agent.Step{
-			Number:         number,
-			Timestamp:      now,
+		stepHistory = append(stepHistory, agent.Step{
+			Number:         stepNumber,
+			Timestamp:      observedAt,
 			ScreenshotPath: screenshotPath,
 			Message:        decision.Reason,
 			Action:         decision.Action,
 		})
+
 		if decision.Done {
 			fmt.Fprintln(config.Output, "Task complete.")
 			return nil
@@ -118,19 +117,53 @@ func Run(ctx context.Context, config Config) (runErr error) {
 		if decision.Action == nil {
 			return errors.New("agent returned neither action nor completion")
 		}
-		fmt.Fprintf(config.Output, "[%s] action: %s%s\n",
-			elapsed(startedAt), decision.Action.Type, actionDetail(*decision.Action))
-		if err := config.Env.SendInput(ctx, *decision.Action); err != nil {
+		fmt.Fprintf(
+			config.Output,
+			"[%s] action: %s%s\n",
+			elapsed(runStartedAt),
+			decision.Action.Type,
+			actionDetail(*decision.Action),
+		)
+		if err := config.Environment.SendInput(ctx, *decision.Action); err != nil {
 			return err
 		}
-		actions = append(actions, *decision.Action)
+		actionHistory = append(actionHistory, *decision.Action)
 	}
 	return fmt.Errorf("agent exceeded maximum of %d steps", config.MaxSteps)
 }
 
+// finalizeRun uses a fresh timeout because the caller's context may already be
+// canceled. Preserving logs and removing the environment must still be tried.
+func finalizeRun(
+	config Config,
+	runErr error,
+) error {
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if logs, err := config.Environment.Logs(cleanupCtx); err == nil {
+		if logErr := config.TraceStore.WriteLogs(logs); runErr == nil && logErr != nil {
+			runErr = logErr
+		}
+	}
+	// Stop is idempotent, so always call it. Start may have created a container
+	// before returning an error while waiting for its graphical services.
+	if stopErr := config.Environment.Stop(cleanupCtx); runErr == nil && stopErr != nil {
+		runErr = stopErr
+	}
+	if finishErr := config.TraceStore.Finish(runErr); runErr == nil && finishErr != nil {
+		runErr = finishErr
+	}
+	return runErr
+}
+
 func elapsed(start time.Time) string {
 	duration := time.Since(start).Round(time.Second)
-	return fmt.Sprintf("%02d:%02d", int(duration.Minutes()), int(duration.Seconds())%60)
+	return fmt.Sprintf(
+		"%02d:%02d",
+		int(duration.Minutes()),
+		int(duration.Seconds())%60,
+	)
 }
 
 func actionDetail(action environment.InputAction) string {

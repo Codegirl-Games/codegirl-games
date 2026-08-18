@@ -11,8 +11,8 @@ func TestX11KeyTranslatesLogicalNames(t *testing.T) {
 		"A":      "a",
 	}
 	for input, want := range tests {
-		if got := x11Key(input); got != want {
-			t.Errorf("x11Key(%q) = %q, want %q", input, got, want)
+		if got := toX11KeyName(input); got != want {
+			t.Errorf("toX11KeyName(%q) = %q, want %q", input, got, want)
 		}
 	}
 }
